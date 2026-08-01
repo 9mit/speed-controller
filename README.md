@@ -1,5 +1,5 @@
 # Stream Pro Speed
-### Playback speed control for Hotstar, Netflix & Prime Video
+### Playback speed control for Hotstar, Netflix, Prime Video, ZEE5, JioCinema, SonyLIV, regional & other major Indian OTT platforms
 
 ![Banner](coverpage.png)
 
@@ -7,13 +7,13 @@
 [![Version](https://img.shields.io/badge/Version-2.1-green.svg)](manifest.json)
 [![Platform](https://img.shields.io/badge/Platform-Chrome%20|%20Edge-lightgrey.svg)](https://developer.chrome.com/docs/extensions/)
 
-Stream Pro Speed is a browser extension for playback rate control on **Disney+ Hotstar / JioHotstar**, **Netflix**, and **Amazon Prime Video**.
+Stream Pro Speed is a browser extension for playback rate control on **Disney+ Hotstar / JioHotstar**, **Netflix**, **Amazon Prime Video**, **ZEE5**, **Airtel Xstream**, **JioCinema**, **SonyLIV**, **Aha**, **Hoichoi**, **Sun NXT**, and **MX Player**.
 
 ---
 
 ## Features
 
-- **Multi-platform**: Works on Hotstar, JioHotstar, Netflix, and Prime Video (including regional Amazon video pages).
+- **Multi-platform**: Works on Hotstar, JioHotstar, Netflix, Prime Video (including regional Amazon video pages), ZEE5, Airtel Xstream, JioCinema, SonyLIV, Aha, Hoichoi, Sun NXT, and MX Player.
 - **Speed presets**: Overlay controls for 1x, 1.5x, 2x, and 2.5x.
 - **Keyboard**: `[` / `]` adjust speed by 0.1 (up to 16x).
 - **Per-title memory**: Remembers your preferred speed per show/movie (namespaced per platform).
@@ -43,6 +43,15 @@ Supported hosts:
 - `*.netflix.com`
 - `*.primevideo.com`
 - Amazon video paths: `*/gp/video/*` on major regional Amazon domains
+- `*.zee5.com`
+- `*.airtelxstream.in`
+- `*.xstreamplay.in`
+- `*.jiocinema.com`
+- `*.sonyliv.com`
+- `*.aha.video`
+- `*.hoichoi.tv`
+- `*.sunnxt.com`
+- `*.mxplayer.in`
 
 ---
 

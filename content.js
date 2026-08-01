@@ -125,6 +125,216 @@
                     /\s*-\s*Amazon\.com.*$/i
                 ]);
             }
+        },
+
+        zee5: {
+            id: 'zee5',
+            label: 'ZEE5',
+            match(hostname) {
+                return /(^|\.)zee5\.com$/i.test(hostname);
+            },
+            getContentId(pathname) {
+                const match = pathname.match(/\/([a-z0-9]+-[a-z0-9]+-[a-z0-9]+)(?:\/|$|\?)/i);
+                if (match) return match[1];
+
+                const parts = pathname.split('/').filter(Boolean);
+                if (parts.length > 0) {
+                    const last = parts[parts.length - 1];
+                    if (/^[a-z0-9_-]+$/i.test(last) && last.length > 4) {
+                        return last;
+                    }
+                }
+                return 'generic';
+            },
+            getTitle() {
+                return cleanTitle(document.title, [
+                    /\s*-\s*ZEE5\s*$/i,
+                    /\s*\|\s*ZEE5\s*$/i,
+                    /\s*Watch\s*.*on\s*ZEE5$/i
+                ]);
+            }
+        },
+
+        airtelxstream: {
+            id: 'airtelxstream',
+            label: 'Airtel Xstream',
+            match(hostname) {
+                return /(^|\.)airtelxstream\.in$/i.test(hostname) || /(^|\.)xstreamplay\.in$/i.test(hostname);
+            },
+            getContentId(pathname) {
+                const detail = pathname.match(/\/detail-page\/([a-z0-9_-]+)/i);
+                if (detail) return detail[1];
+
+                const parts = pathname.split('/').filter(Boolean);
+                if (parts.length > 0) {
+                    const last = parts[parts.length - 1];
+                    if (/^[a-z0-9_-]+$/i.test(last) && last.length > 4) {
+                        return last;
+                    }
+                }
+                return 'generic';
+            },
+            getTitle() {
+                return cleanTitle(document.title, [
+                    /\s*-\s*Airtel Xstream.*$/i,
+                    /\s*\|\s*Airtel Xstream.*$/i,
+                    /\s*-\s*Airtel Xstream Play.*$/i,
+                    /\s*\|\s*Airtel Xstream Play.*$/i
+                ]);
+            }
+        },
+
+        jiocinema: {
+            id: 'jiocinema',
+            label: 'JioCinema',
+            match(hostname) {
+                return /(^|\.)jiocinema\.com$/i.test(hostname);
+            },
+            getContentId(pathname) {
+                const parts = pathname.split('/').filter(Boolean);
+                if (parts.length > 0) {
+                    const last = parts[parts.length - 1];
+                    if (/^[a-z0-9_-]+$/i.test(last) && last.length > 4) {
+                        return last;
+                    }
+                }
+                return 'generic';
+            },
+            getTitle() {
+                return cleanTitle(document.title, [
+                    /\s*-\s*JioCinema\s*$/i,
+                    /\s*\|\s*JioCinema\s*$/i,
+                    /\s*Watch\s*.*on\s*JioCinema$/i
+                ]);
+            }
+        },
+
+        sonyliv: {
+            id: 'sonyliv',
+            label: 'SonyLIV',
+            match(hostname) {
+                return /(^|\.)sonyliv\.com$/i.test(hostname);
+            },
+            getContentId(pathname) {
+                const match = pathname.match(/-(\d{6,15})(?:\/|$|\?)/i) || pathname.match(/\/(\d{6,15})(?:\/|$|\?)/i);
+                if (match) return match[1];
+
+                const parts = pathname.split('/').filter(Boolean);
+                if (parts.length > 0) {
+                    const last = parts[parts.length - 1];
+                    if (/^[a-z0-9_-]+$/i.test(last) && last.length > 4) {
+                        return last;
+                    }
+                }
+                return 'generic';
+            },
+            getTitle() {
+                return cleanTitle(document.title, [
+                    /\s*-\s*SonyLIV\s*$/i,
+                    /\s*\|\s*SonyLIV\s*$/i,
+                    /\s*Watch\s*.*on\s*SonyLIV$/i
+                ]);
+            }
+        },
+
+        aha: {
+            id: 'aha',
+            label: 'Aha',
+            match(hostname) {
+                return /(^|\.)aha\.video$/i.test(hostname);
+            },
+            getContentId(pathname) {
+                const parts = pathname.split('/').filter(Boolean);
+                if (parts.length > 0) {
+                    const last = parts[parts.length - 1];
+                    if (/^[a-z0-9_-]+$/i.test(last) && last.length > 4) {
+                        return last;
+                    }
+                }
+                return 'generic';
+            },
+            getTitle() {
+                return cleanTitle(document.title, [
+                    /\s*-\s*aha\s*$/i,
+                    /\s*\|\s*aha\s*$/i,
+                    /\s*Watch\s*.*on\s*aha$/i
+                ]);
+            }
+        },
+
+        hoichoi: {
+            id: 'hoichoi',
+            label: 'Hoichoi',
+            match(hostname) {
+                return /(^|\.)hoichoi\.tv$/i.test(hostname);
+            },
+            getContentId(pathname) {
+                const parts = pathname.split('/').filter(Boolean);
+                if (parts.length > 0) {
+                    const last = parts[parts.length - 1];
+                    if (/^[a-z0-9_-]+$/i.test(last) && last.length > 4) {
+                        return last;
+                    }
+                }
+                return 'generic';
+            },
+            getTitle() {
+                return cleanTitle(document.title, [
+                    /\s*-\s*hoichoi\s*$/i,
+                    /\s*\|\s*hoichoi\s*$/i,
+                    /\s*Watch\s*.*on\s*hoichoi$/i
+                ]);
+            }
+        },
+
+        sunnxt: {
+            id: 'sunnxt',
+            label: 'Sun NXT',
+            match(hostname) {
+                return /(^|\.)sunnxt\.com$/i.test(hostname);
+            },
+            getContentId(pathname) {
+                const parts = pathname.split('/').filter(Boolean);
+                if (parts.length > 0) {
+                    const last = parts[parts.length - 1];
+                    if (/^[a-z0-9_-]+$/i.test(last) && last.length > 4) {
+                        return last;
+                    }
+                }
+                return 'generic';
+            },
+            getTitle() {
+                return cleanTitle(document.title, [
+                    /\s*-\s*Sun NXT\s*$/i,
+                    /\s*\|\s*Sun NXT\s*$/i,
+                    /\s*Watch\s*.*on\s*Sun NXT$/i
+                ]);
+            }
+        },
+
+        mxplayer: {
+            id: 'mxplayer',
+            label: 'MX Player',
+            match(hostname) {
+                return /(^|\.)mxplayer\.in$/i.test(hostname);
+            },
+            getContentId(pathname) {
+                const parts = pathname.split('/').filter(Boolean);
+                if (parts.length > 0) {
+                    const last = parts[parts.length - 1];
+                    if (/^[a-z0-9_-]+$/i.test(last) && last.length > 4) {
+                        return last;
+                    }
+                }
+                return 'generic';
+            },
+            getTitle() {
+                return cleanTitle(document.title, [
+                    /\s*-\s*MX Player\s*$/i,
+                    /\s*\|\s*MX Player\s*$/i,
+                    /\s*Watch\s*.*on\s*MX Player$/i
+                ]);
+            }
         }
     };
 

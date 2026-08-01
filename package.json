@@ -1,7 +1,7 @@
 {
   "name": "stream-pro-speed",
   "version": "2.1.0",
-  "description": "Content-aware playback rate control for Hotstar, Netflix, and Prime Video",
+  "description": "Playback speed control for Hotstar, Netflix, Prime Video, ZEE5, JioCinema, SonyLIV, regional & major Indian OTT platforms",
   "private": true,
   "scripts": {
     "zip": "powershell -Command \"Compress-Archive -Path background.js, content.js, manifest.json, styles.css, coverpage.png -DestinationPath stream-pro-speed-v2.1.zip -Force\""
@@ -12,6 +12,15 @@
     "netflix",
     "primevideo",
     "amazon",
+    "zee5",
+    "jiocinema",
+    "sonyliv",
+    "aha",
+    "hoichoi",
+    "sunnxt",
+    "mxplayer",
+    "airtelxstream",
+    "xstreamplay",
     "speed",
     "playback",
     "chrome-extension"

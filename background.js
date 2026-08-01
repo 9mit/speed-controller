@@ -2,7 +2,16 @@ const STREAM_DOMAINS = new Set([
     'hotstar.com',
     'jiohotstar.com',
     'netflix.com',
-    'primevideo.com'
+    'primevideo.com',
+    'zee5.com',
+    'airtelxstream.in',
+    'xstreamplay.in',
+    'jiocinema.com',
+    'sonyliv.com',
+    'aha.video',
+    'hoichoi.tv',
+    'sunnxt.com',
+    'mxplayer.in'
 ]);
 
 const AMAZON_DOMAINS = new Set([
