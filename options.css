@@ -1,0 +1,207 @@
+:root {
+    --hse-accent: #1f80e0;
+    --hse-success: #0bb36f;
+    --hse-warning: #ffcc00;
+    --hse-danger: #ff4d4d;
+    --hse-bg: #091830;
+    --hse-panel-bg: rgba(16, 33, 62, 0.75);
+    --hse-glass-border: rgba(255, 255, 255, 0.15);
+    --hse-text: #ffffff;
+    --hse-text-dim: rgba(255, 255, 255, 0.7);
+    --hse-radius: 16px;
+}
+
+body {
+    margin: 0;
+    padding: 40px 20px;
+    background: var(--hse-bg);
+    color: var(--hse-text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+    box-sizing: border-box;
+}
+
+.glass-panel {
+    background: var(--hse-panel-bg);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    padding: 32px;
+    border-radius: var(--hse-radius);
+    border: 1px solid var(--hse-glass-border);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    width: 100%;
+    max-width: 500px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--hse-glass-border);
+    padding-bottom: 24px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.logo img {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.logo h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.logo p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--hse-text-dim);
+}
+
+.badge {
+    background: var(--hse-accent);
+    color: white;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(31, 128, 224, 0.4);
+}
+
+.settings-group {
+    margin-bottom: 32px;
+}
+
+.settings-group h2 {
+    font-size: 16px;
+    margin: 0 0 8px;
+    font-weight: 600;
+    color: var(--hse-accent);
+}
+
+.section-desc {
+    font-size: 13px;
+    color: var(--hse-text-dim);
+    margin: 0 0 16px;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.setting-item:last-child {
+    border-bottom: none;
+}
+
+.setting-item label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.hotkey-input, .select-input {
+    appearance: none;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--hse-glass-border);
+    color: var(--hse-text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 14px;
+    width: 120px;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.hotkey-input:focus {
+    outline: none;
+    border-color: var(--hse-accent);
+    box-shadow: 0 0 0 3px rgba(31, 128, 224, 0.25);
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.hotkey-input.listening {
+    border-color: var(--hse-warning);
+    box-shadow: 0 0 0 3px rgba(255, 204, 0, 0.25);
+    color: var(--hse-warning);
+}
+
+.select-input {
+    width: 146px;
+    font-family: inherit;
+    text-align: left;
+}
+
+.select-input option {
+    background: var(--hse-bg);
+    color: var(--hse-text);
+}
+
+footer {
+    display: flex;
+    gap: 12px;
+    margin-top: 40px;
+}
+
+.primary-btn, .secondary-btn {
+    appearance: none;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex: 1;
+}
+
+.primary-btn {
+    background: var(--hse-accent);
+    color: white;
+    box-shadow: 0 4px 12px rgba(31, 128, 224, 0.3);
+}
+
+.primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(31, 128, 224, 0.4);
+}
+
+.secondary-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--hse-text);
+    border: 1px solid var(--hse-glass-border);
+}
+
+.secondary-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.status-message {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 13px;
+    font-weight: 500;
+    min-height: 20px;
+    color: var(--hse-success);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.status-message.show {
+    opacity: 1;
+}

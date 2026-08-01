@@ -70,9 +70,19 @@
   },
   "action": {
     "default_title": "Stream Pro Speed",
-    "default_icon": "coverpage.png"
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "icons": {
-    "128": "coverpage.png"
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   }
 }

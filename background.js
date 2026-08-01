@@ -95,3 +95,9 @@ chrome.action.onClicked.addListener(async (tab) => {
         // Fail closed: do not log tab URLs, titles, or error payloads (can contain PII).
     }
 });
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message && message.action === 'openOptionsPage') {
+        chrome.runtime.openOptionsPage();
+    }
+});

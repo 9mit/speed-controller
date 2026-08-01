@@ -1,7 +1,7 @@
 # Stream Pro Speed
 ### Playback speed control for Hotstar, Netflix, Prime Video, ZEE5, JioCinema, SonyLIV, regional & other major Indian OTT platforms
 
-![Banner](coverpage.png)
+<img src="icon128.png" width="128" height="128" alt="Stream Pro Speed Logo">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-2.1-green.svg)](manifest.json)

@@ -26,7 +26,7 @@
     border: 1px solid var(--hse-glass-border) !important;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
     width: 280px !important;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
     user-select: none !important;
     opacity: 1 !important;
@@ -67,7 +67,24 @@
     letter-spacing: 0.5px !important;
 }
 
+.hse-badges-container {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
 
+.hs-speed-settings-icon {
+    color: var(--hse-text-dim) !important;
+    cursor: pointer !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+    transition: all 0.2s ease !important;
+}
+
+.hs-speed-settings-icon:hover {
+    color: var(--hse-text) !important;
+    transform: rotate(45deg) !important;
+}
 
 #hs-speed-status {
     color: var(--hse-text-dim) !important;

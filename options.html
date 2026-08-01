@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Pro Speed - Settings</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="glass-panel">
+        <header>
+            <div class="logo">
+                <img src="icon48.png" alt="Logo" width="48" height="48">
+                <div>
+                    <h1>Stream Pro Speed</h1>
+                    <p>Feature Configuration</p>
+                </div>
+            </div>
+            <span class="badge">PRO</span>
+        </header>
+
+        <section class="settings-group">
+            <h2>Keyboard Shortcuts</h2>
+            <p class="section-desc">Click on an input field and press a key to rebind it.</p>
+            
+            <div class="setting-item">
+                <label for="keySpeedUp">Speed Up (+0.1x)</label>
+                <input type="text" id="keySpeedUp" readonly class="hotkey-input">
+            </div>
+            
+            <div class="setting-item">
+                <label for="keySpeedDown">Speed Down (-0.1x)</label>
+                <input type="text" id="keySpeedDown" readonly class="hotkey-input">
+            </div>
+
+            <div class="setting-item">
+                <label for="keyReset">Reset Speed (1.0x)</label>
+                <input type="text" id="keyReset" readonly class="hotkey-input">
+            </div>
+        </section>
+
+        <section class="settings-group">
+            <h2>Media Controls</h2>
+            
+            <div class="setting-item">
+                <label for="keySkipForward">Skip Forward (10s)</label>
+                <input type="text" id="keySkipForward" readonly class="hotkey-input">
+            </div>
+            
+            <div class="setting-item">
+                <label for="keySkipBack">Rewind (10s)</label>
+                <input type="text" id="keySkipBack" readonly class="hotkey-input">
+            </div>
+        </section>
+
+        <section class="settings-group">
+            <h2>Smart Speed</h2>
+            <p class="section-desc">Hold this key to temporarily fast-forward.</p>
+            
+            <div class="setting-item">
+                <label for="keySmartSpeed">Smart Speed Key</label>
+                <input type="text" id="keySmartSpeed" readonly class="hotkey-input">
+            </div>
+
+            <div class="setting-item">
+                <label for="smartSpeedValue">Smart Speed Multiplier</label>
+                <select id="smartSpeedValue" class="select-input">
+                    <option value="1.5">1.5x</option>
+                    <option value="2.0">2.0x</option>
+                    <option value="2.5">2.5x</option>
+                    <option value="3.0">3.0x</option>
+                    <option value="4.0">4.0x</option>
+                </select>
+            </div>
+        </section>
+
+        <footer>
+            <button id="saveBtn" class="primary-btn">Save Changes</button>
+            <button id="resetBtn" class="secondary-btn">Reset Defaults</button>
+        </footer>
+        <div id="statusMessage" class="status-message"></div>
+    </div>
+    <script src="options.js"></script>
+</body>
+</html>

@@ -358,54 +358,72 @@
             globalSpeed: 1,
             showSpeeds: {}
         },
+        customSettings: {
+            keySpeedUp: ']',
+            keySpeedDown: '[',
+            keyReset: 'r',
+            keySkipForward: 'ArrowRight',
+            keySkipBack: 'ArrowLeft',
+            keySmartSpeed: 'Shift',
+            smartSpeedValue: 2.0
+        },
 
         /**
          * Accept only known fields. Never persist titles, URLs, cookies, or PII.
          * showSpeeds values are numeric playback rates keyed by platform:contentId.
          */
-        hydrateFromStorage(raw) {
-            if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
+        hydrateFromStorage(raw, customRaw) {
+            if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+                if (typeof raw.globalSpeed === 'number') {
+                    this.settings.globalSpeed = sanitizeSpeed(raw.globalSpeed, 1);
+                }
 
-            if (typeof raw.globalSpeed === 'number') {
-                this.settings.globalSpeed = sanitizeSpeed(raw.globalSpeed, 1);
+                const speeds = raw.showSpeeds;
+                if (speeds && typeof speeds === 'object' && !Array.isArray(speeds)) {
+                    const cleaned = {};
+                    for (const [key, value] of Object.entries(speeds)) {
+                        if (typeof key !== 'string' || key.length > 64) continue;
+                        if (!/^[a-z0-9:_-]+$/i.test(key)) continue;
+                        if (typeof value !== 'number') continue;
+                        cleaned[key] = sanitizeSpeed(value);
+                    }
+                    this.settings.showSpeeds = cleaned;
+                }
             }
 
-            const speeds = raw.showSpeeds;
-            if (!speeds || typeof speeds !== 'object' || Array.isArray(speeds)) return;
-
-            const cleaned = {};
-            for (const [key, value] of Object.entries(speeds)) {
-                if (typeof key !== 'string' || key.length > 64) continue;
-                if (!/^[a-z0-9:_-]+$/i.test(key)) continue;
-                if (typeof value !== 'number') continue;
-                cleaned[key] = sanitizeSpeed(value);
+            if (customRaw && typeof customRaw === 'object') {
+                this.customSettings = { ...this.customSettings, ...customRaw };
+                this.customSettings.smartSpeedValue = parseFloat(this.customSettings.smartSpeedValue) || 2.0;
             }
-            this.settings.showSpeeds = cleaned;
         },
 
         async init() {
-            return new Promise((resolve) => {
-                if (typeof chrome === 'undefined' || !chrome.storage) {
-                    return resolve();
+            try {
+                if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) {
+                    return;
                 }
-                chrome.storage.local.get(['hse_settings'], (result) => {
-                    this.hydrateFromStorage(result.hse_settings);
-                    resolve();
-                });
-            });
+                const result = await chrome.storage.local.get(['hse_settings', 'hse_custom_settings']);
+                this.hydrateFromStorage(result.hse_settings, result.hse_custom_settings);
+            } catch (err) {
+                console.warn('Stream Pro Speed: Extension context invalidated during init.', err);
+            }
         },
 
         async save() {
-            return new Promise((resolve) => {
-                // Explicit allowlist payload — never write page titles or URLs.
+            try {
+                if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) {
+                    return;
+                }
                 const payload = {
                     hse_settings: {
                         globalSpeed: this.settings.globalSpeed,
                         showSpeeds: this.settings.showSpeeds
                     }
                 };
-                chrome.storage.local.set(payload, resolve);
-            });
+                await chrome.storage.local.set(payload);
+            } catch (err) {
+                console.warn('Stream Pro Speed: Extension context invalidated during save.', err);
+            }
         },
 
         storageKey(showId) {
@@ -554,8 +572,30 @@
             badge.className = 'hse-badge';
             badge.textContent = Platform.label;
 
+            const settingsBtn = document.createElement('span');
+            settingsBtn.className = 'hs-speed-settings-icon';
+            settingsBtn.innerHTML = '&#9881;';
+            settingsBtn.title = 'Open Settings';
+            settingsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                try {
+                    if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+                        chrome.runtime.sendMessage({ action: 'openOptionsPage' }).catch(err => {
+                            console.warn('Stream Pro Speed: Failed to open options page.', err);
+                        });
+                    }
+                } catch (err) {
+                    console.warn('Stream Pro Speed: Cannot open options page, context invalidated.', err);
+                }
+            });
+
+            const badgesContainer = document.createElement('div');
+            badgesContainer.className = 'hse-badges-container';
+            badgesContainer.appendChild(badge);
+            badgesContainer.appendChild(settingsBtn);
+
             header.appendChild(titleEl);
-            header.appendChild(badge);
+            header.appendChild(badgesContainer);
 
             const status = document.createElement('div');
             status.id = 'hs-speed-status';
@@ -629,16 +669,57 @@
 
     // --- HSE_Input: Keyboard ---
     const HSE_Input = {
+        isSmartSpeedActive: false,
+        preSmartSpeed: 1,
+
+        formatKey(e) {
+            if (e.key === ' ') return 'Space';
+            if (e.key.length === 1) return e.key;
+            return e.key;
+        },
+
         init() {
             window.addEventListener('keydown', (e) => {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
                     return;
                 }
 
-                if (e.key === '[') {
+                const keyName = this.formatKey(e);
+                const custom = HSE_Store.customSettings;
+
+                if (keyName === custom.keySmartSpeed && !this.isSmartSpeedActive && !e.repeat) {
+                    this.isSmartSpeedActive = true;
+                    this.preSmartSpeed = HSE_Engine.currentSpeed;
+                    HSE_Engine.setSpeed(custom.smartSpeedValue, false);
+                    HSE_UI.flash(`Fast Forward ${custom.smartSpeedValue}x`, true);
+                    return;
+                }
+
+                if (keyName === custom.keySpeedDown) {
                     HSE_Engine.setSpeed(Math.max(0.1, +(HSE_Engine.currentSpeed - 0.1).toFixed(1)));
-                } else if (e.key === ']') {
+                } else if (keyName === custom.keySpeedUp) {
                     HSE_Engine.setSpeed(Math.min(MAX_SPEED, +(HSE_Engine.currentSpeed + 0.1).toFixed(1)));
+                } else if (keyName === custom.keyReset) {
+                    HSE_Engine.setSpeed(1.0);
+                } else if (keyName === custom.keySkipForward) {
+                    const video = HSE_Intel.getVideo();
+                    if (video) video.currentTime += 10;
+                    HSE_UI.flash('+10s');
+                } else if (keyName === custom.keySkipBack) {
+                    const video = HSE_Intel.getVideo();
+                    if (video) video.currentTime -= 10;
+                    HSE_UI.flash('-10s');
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                const keyName = this.formatKey(e);
+                const custom = HSE_Store.customSettings;
+
+                if (keyName === custom.keySmartSpeed && this.isSmartSpeedActive) {
+                    this.isSmartSpeedActive = false;
+                    HSE_Engine.setSpeed(this.preSmartSpeed, false);
+                    HSE_UI.flash(`${this.preSmartSpeed}x`);
                 }
             });
         }
