@@ -1,8 +1,8 @@
-# Privacy Policy for Stream Pro Speed
+# Privacy Policy for OTT SPEED PLAYBACK
 
 Last updated: August 2026
 
-**Stream Pro Speed** ("the Extension") is committed to protecting your privacy. This Privacy Policy explains our data collection, use, and disclosure practices.
+**OTT SPEED PLAYBACK** ("the Extension") is committed to protecting your privacy. This Privacy Policy explains our data collection, use, and disclosure practices.
 
 ## 1. Data Collection and Usage
 The Extension **does not collect, transmit, distribute, or sell any of your personal data**. 

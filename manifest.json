@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Stream Pro Speed",
+  "name": "OTT SPEED PLAYBACK",
   "version": "2.1",
-  "description": "Playback speed control for Hotstar, Netflix, Prime Video, ZEE5, JioCinema, SonyLIV, and other major Indian OTT platforms",
+  "description": "Adjust playback speed with custom rate controls, keyboard shortcuts, and saved speed preferences on your favorite streaming services.",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
     "https://*.hotstar.com/*",
@@ -69,7 +69,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Stream Pro Speed",
+    "default_title": "OTT SPEED PLAYBACK",
     "default_icon": {
       "16": "icon16.png",
       "48": "icon48.png",

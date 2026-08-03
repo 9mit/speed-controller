@@ -1,5 +1,5 @@
 /**
- * Stream Pro Speed (v2.1)
+ * OTT SPEED PLAYBACK (v2.1)
  * Playback rate control for Hotstar, JioHotstar, Netflix, and Prime Video.
  */
 (function () {
@@ -405,7 +405,7 @@
                 const result = await chrome.storage.local.get(['hse_settings', 'hse_custom_settings']);
                 this.hydrateFromStorage(result.hse_settings, result.hse_custom_settings);
             } catch (err) {
-                console.warn('Stream Pro Speed: Extension context invalidated during init.', err);
+                console.warn('OTT SPEED PLAYBACK: Extension context invalidated during init.', err);
             }
         },
 
@@ -422,7 +422,7 @@
                 };
                 await chrome.storage.local.set(payload);
             } catch (err) {
-                console.warn('Stream Pro Speed: Extension context invalidated during save.', err);
+                console.warn('OTT SPEED PLAYBACK: Extension context invalidated during save.', err);
             }
         },
 
@@ -581,11 +581,11 @@
                 try {
                     if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
                         chrome.runtime.sendMessage({ action: 'openOptionsPage' }).catch(err => {
-                            console.warn('Stream Pro Speed: Failed to open options page.', err);
+                            console.warn('OTT SPEED PLAYBACK: Failed to open options page.', err);
                         });
                     }
                 } catch (err) {
-                    console.warn('Stream Pro Speed: Cannot open options page, context invalidated.', err);
+                    console.warn('OTT SPEED PLAYBACK: Cannot open options page, context invalidated.', err);
                 }
             });
 

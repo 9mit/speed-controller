@@ -1,13 +1,13 @@
-# Stream Pro Speed
-### Playback speed control for Hotstar, Netflix, Prime Video, ZEE5, JioCinema, SonyLIV, regional & other major Indian OTT platforms
+# OTT SPEED PLAYBACK
+### Adjust playback speed with custom rate controls, keyboard shortcuts, and saved speed preferences on your favorite streaming services.
 
-<img src="icon128.png" width="128" height="128" alt="Stream Pro Speed Logo">
+<img src="icon128.png" width="128" height="128" alt="OTT SPEED PLAYBACK Logo">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-2.1-green.svg)](manifest.json)
 [![Platform](https://img.shields.io/badge/Platform-Chrome%20|%20Edge-lightgrey.svg)](https://developer.chrome.com/docs/extensions/)
 
-Stream Pro Speed is a browser extension for playback rate control on **Disney+ Hotstar / JioHotstar**, **Netflix**, **Amazon Prime Video**, **ZEE5**, **Airtel Xstream**, **JioCinema**, **SonyLIV**, **Aha**, **Hoichoi**, **Sun NXT**, and **MX Player**.
+OTT SPEED PLAYBACK is a browser extension for playback rate control on **Disney+ Hotstar / JioHotstar**, **Netflix**, **Amazon Prime Video**, **ZEE5**, **Airtel Xstream**, **JioCinema**, **SonyLIV**, **Aha**, **Hoichoi**, **Sun NXT**, and **MX Player**.
 
 ---
 
