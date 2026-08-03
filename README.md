@@ -1,5 +1,5 @@
 # OTT SPEED PLAYBACK
-### Adjust playback speed with custom rate controls, keyboard shortcuts, and saved speed preferences on your favorite streaming services.
+### Adjust playback speed with custom rate controls, keyboard shortcuts, and saved speed preferences on popular streaming services.
 
 <img src="icon128.png" width="128" height="128" alt="OTT SPEED PLAYBACK Logo">
 

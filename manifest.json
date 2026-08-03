@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "OTT SPEED PLAYBACK",
   "version": "2.1",
-  "description": "Adjust playback speed with custom rate controls, keyboard shortcuts, and saved speed preferences on your favorite streaming services.",
+  "description": "Adjust playback speed with custom rate controls, keyboard shortcuts, and saved speed preferences on popular streaming services.",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
     "https://*.hotstar.com/*",
