@@ -1,10 +1,11 @@
 {
   "name": "ott-speed-playback",
-  "version": "2.1.0",
-  "description": "Adjust playback speed with custom rate controls, keyboard shortcuts, and saved speed preferences on popular streaming services.",
+  "version": "3.0.0",
+  "description": "Finish videos in the time you have with adaptive playback speed and local personal pace memory.",
   "private": true,
   "scripts": {
-    "zip": "powershell -Command \"Compress-Archive -Path background.js, content.js, manifest.json, styles.css, options.html, options.css, options.js, icon16.png, icon48.png, icon128.png -DestinationPath ott-speed-playback-v2.1.zip -Force\""
+    "check": "node --check content.js && node --check background.js && node --check options.js",
+    "zip": "powershell -Command \"Compress-Archive -Path background.js, content.js, manifest.json, styles.css, options.html, options.css, options.js, icon16.png, icon48.png, icon128.png -DestinationPath ott-speed-playback-v3.0.zip -Force\""
   },
   "keywords": [
     "hotstar",
