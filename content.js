@@ -10,7 +10,9 @@
     const DEFAULT_SPEEDS = [1, 1.5, 2, 2.5];
     const REFRESH_MS = 1000;
     const MAX_SPEED = 16;
-
+    const SMART_PACE_MIN_SPEED = 1;
+    const SMART_PACE_TICK_MS = 1000;
+    const DEFAULT_FINISH_MINUTES = 30;
     if (document.documentElement.dataset[ROOT_FLAG] === 'true') {
         window.dispatchEvent(new CustomEvent(TOGGLE_EVENT));
         return;
@@ -356,7 +358,11 @@
     const HSE_Store = {
         settings: {
             globalSpeed: 1,
-            showSpeeds: {}
+            showSpeeds: {},
+            paceProfile: {
+                global: { averageSpeed: 1.5, samples: 0 },
+                platforms: {}
+            }
         },
         customSettings: {
             keySpeedUp: ']',
@@ -365,19 +371,15 @@
             keySkipForward: 'ArrowRight',
             keySkipBack: 'ArrowLeft',
             keySmartSpeed: 'Shift',
-            smartSpeedValue: 2.0
+            smartSpeedValue: 2.0,
+            finishMinutes: DEFAULT_FINISH_MINUTES
         },
 
-        /**
-         * Accept only known fields. Never persist titles, URLs, cookies, or PII.
-         * showSpeeds values are numeric playback rates keyed by platform:contentId.
-         */
         hydrateFromStorage(raw, customRaw) {
             if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
                 if (typeof raw.globalSpeed === 'number') {
                     this.settings.globalSpeed = sanitizeSpeed(raw.globalSpeed, 1);
                 }
-
                 const speeds = raw.showSpeeds;
                 if (speeds && typeof speeds === 'object' && !Array.isArray(speeds)) {
                     const cleaned = {};
@@ -389,41 +391,65 @@
                     }
                     this.settings.showSpeeds = cleaned;
                 }
+                const rawProfile = raw.paceProfile;
+                if (rawProfile && typeof rawProfile === 'object' && !Array.isArray(rawProfile)) {
+                    const global = rawProfile.global;
+                    if (global && typeof global === 'object') {
+                        const averageSpeed = sanitizeSpeed(global.averageSpeed, 1.5);
+                        const samples = Number.isFinite(global.samples) ? Math.max(0, Math.min(10000, Math.floor(global.samples))) : 0;
+                        this.settings.paceProfile.global = { averageSpeed, samples };
+                    }
+                    const platforms = rawProfile.platforms;
+                    if (platforms && typeof platforms === 'object' && !Array.isArray(platforms)) {
+                        const cleanedPlatforms = {};
+                        for (const [platformId, profile] of Object.entries(platforms)) {
+                            if (!/^[a-z0-9_-]+$/i.test(platformId)) continue;
+                            if (!profile || typeof profile !== 'object') continue;
+                            cleanedPlatforms[platformId] = {
+                                averageSpeed: sanitizeSpeed(profile.averageSpeed, 1.5),
+                                samples: Number.isFinite(profile.samples) ? Math.max(0, Math.min(10000, Math.floor(profile.samples))) : 0
+                            };
+                        }
+                        this.settings.paceProfile.platforms = cleanedPlatforms;
+                    }
+                }
             }
 
             if (customRaw && typeof customRaw === 'object') {
                 this.customSettings = { ...this.customSettings, ...customRaw };
                 this.customSettings.smartSpeedValue = parseFloat(this.customSettings.smartSpeedValue) || 2.0;
+                this.customSettings.finishMinutes = Number.isFinite(Number(this.customSettings.finishMinutes))
+                    ? Math.max(1, Math.min(600, Math.round(Number(this.customSettings.finishMinutes))))
+                    : DEFAULT_FINISH_MINUTES;
             }
         },
 
         async init() {
             try {
-                if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) {
-                    return;
-                }
+                if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) return;
                 const result = await chrome.storage.local.get(['hse_settings', 'hse_custom_settings']);
                 this.hydrateFromStorage(result.hse_settings, result.hse_custom_settings);
-            } catch (err) {
-                console.warn('OTT SPEED PLAYBACK: Extension context invalidated during init.', err);
-            }
+            } catch (_) {}
         },
 
         async save() {
             try {
-                if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) {
-                    return;
-                }
-                const payload = {
+                if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) return;
+                await chrome.storage.local.set({
                     hse_settings: {
                         globalSpeed: this.settings.globalSpeed,
-                        showSpeeds: this.settings.showSpeeds
+                        showSpeeds: this.settings.showSpeeds,
+                        paceProfile: this.settings.paceProfile
                     }
-                };
-                await chrome.storage.local.set(payload);
-            } catch (err) {
-                console.warn('OTT SPEED PLAYBACK: Extension context invalidated during save.', err);
-            }
+                });
+            } catch (_) {}
+        },
+
+        async saveCustom() {
+            try {
+                if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) return;
+                await chrome.storage.local.set({ hse_custom_settings: this.customSettings });
+            } catch (_) {}
         },
 
         storageKey(showId) {
@@ -432,18 +458,35 @@
 
         getSpeedForShow(showId) {
             const key = this.storageKey(showId);
-            // Prefer platform-namespaced key; fall back to bare Hotstar IDs for migration
-            if (this.settings.showSpeeds[key] != null) {
-                return this.settings.showSpeeds[key];
-            }
-            if (Platform.id === 'hotstar' && this.settings.showSpeeds[showId] != null) {
-                return this.settings.showSpeeds[showId];
-            }
-            return this.settings.globalSpeed;
+            if (this.settings.showSpeeds[key] != null) return this.settings.showSpeeds[key];
+            if (Platform.id === 'hotstar' && this.settings.showSpeeds[showId] != null) return this.settings.showSpeeds[showId];
+            return this.getPersonalPace();
         },
 
         setSpeedForShow(showId, speed) {
             this.settings.showSpeeds[this.storageKey(showId)] = sanitizeSpeed(speed);
+            this.save();
+        },
+
+        getPersonalPace() {
+            const platformProfile = this.settings.paceProfile.platforms[Platform.id];
+            if (platformProfile && platformProfile.samples > 0) {
+                return sanitizeSpeed(platformProfile.averageSpeed, 1.5);
+            }
+            return sanitizeSpeed(this.settings.paceProfile.global.averageSpeed, 1.5);
+        },
+
+        recordManualSpeed(speed) {
+            const clamped = sanitizeSpeed(speed, 1);
+            const global = this.settings.paceProfile.global;
+            const platform = this.settings.paceProfile.platforms[Platform.id] || { averageSpeed: clamped, samples: 0 };
+            const alpha = platform.samples < 5 ? 0.35 : 0.15;
+            platform.averageSpeed = sanitizeSpeed(platform.averageSpeed + alpha * (clamped - platform.averageSpeed), clamped);
+            platform.samples = Math.min(10000, platform.samples + 1);
+            const globalAlpha = global.samples < 10 ? 0.2 : 0.08;
+            global.averageSpeed = sanitizeSpeed(global.averageSpeed + globalAlpha * (clamped - global.averageSpeed), clamped);
+            global.samples = Math.min(10000, global.samples + 1);
+            this.settings.paceProfile.platforms[Platform.id] = platform;
             this.save();
         }
     };
@@ -474,11 +517,17 @@
     const HSE_Engine = {
         currentSpeed: 1,
         lastContentId: null,
+        smartPace: {
+            enabled: false,
+            targetEndAt: 0,
+            targetSeconds: 0,
+            startedAt: 0,
+            preSmartSpeed: 1
+        },
 
-        setSpeed(speed, isPersistent = true) {
+        setSpeed(speed, isPersistent = true, source = 'manual') {
             const video = HSE_Intel.getVideo();
             if (!video) return;
-
             const clamped = sanitizeSpeed(speed);
             this.currentSpeed = clamped;
             video.playbackRate = clamped;
@@ -487,17 +536,107 @@
             if (isPersistent) {
                 const info = HSE_Intel.getContentInfo();
                 HSE_Store.setSpeedForShow(info.id, clamped);
+                if (source === 'manual') HSE_Store.recordManualSpeed(clamped);
                 HSE_UI.update();
                 HSE_UI.flash(clamped + 'x');
             }
         },
 
+        getPersonalPace() {
+            return HSE_Store.getPersonalPace();
+        },
+
+        startSmartPace(minutes) {
+            const video = HSE_Intel.getVideo();
+            const requestedMinutes = Number(minutes);
+            if (!video || !Number.isFinite(video.duration) || video.duration <= 0) {
+                HSE_UI.flash('Video duration unavailable', true);
+                return false;
+            }
+
+            const safeMinutes = Math.max(1, Math.min(600, requestedMinutes));
+            const targetSeconds = safeMinutes * 60;
+            const remainingVideoSeconds = Math.max(0, video.duration - video.currentTime);
+            const minimumRequiredSpeed = remainingVideoSeconds / targetSeconds;
+
+            if (minimumRequiredSpeed > MAX_SPEED) {
+                HSE_UI.flash(`Need ${minimumRequiredSpeed.toFixed(1)}x (max ${MAX_SPEED}x)`, true);
+                return false;
+            }
+
+            this.smartPace.enabled = true;
+            this.smartPace.targetSeconds = targetSeconds;
+            this.smartPace.startedAt = Date.now();
+            this.smartPace.targetEndAt = Date.now() + targetSeconds * 1000;
+            this.smartPace.preSmartSpeed = this.currentSpeed;
+            this.tickSmartPace(true);
+            HSE_Store.customSettings.finishMinutes = Math.round(safeMinutes);
+            HSE_Store.saveCustom();
+            HSE_UI.resetHideTimer();
+            HSE_UI.flash(`Smart Pace: ${this.currentSpeed.toFixed(2)}x`, true);
+            return true;
+        },
+
+        stopSmartPace(restore = true) {
+            if (!this.smartPace.enabled) return;
+            const restoreSpeed = this.smartPace.preSmartSpeed;
+            this.smartPace.enabled = false;
+            this.smartPace.targetEndAt = 0;
+            this.smartPace.targetSeconds = 0;
+            this.smartPace.startedAt = 0;
+            if (restore) this.setSpeed(restoreSpeed, false, 'smart-pace-stop');
+            HSE_UI.update();
+        },
+
+        tickSmartPace(force = false) {
+            if (!this.smartPace.enabled) return;
+            const video = HSE_Intel.getVideo();
+            if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return;
+
+            const remainingVideoSeconds = Math.max(0, video.duration - video.currentTime);
+            if (remainingVideoSeconds <= 0.5) {
+                this.smartPace.enabled = false;
+                HSE_UI.update();
+                return;
+            }
+
+            const remainingWallSeconds = Math.max(0.5, (this.smartPace.targetEndAt - Date.now()) / 1000);
+            const requiredSpeed = remainingVideoSeconds / remainingWallSeconds;
+            const nextSpeed = Math.min(MAX_SPEED, Math.max(SMART_PACE_MIN_SPEED, requiredSpeed));
+
+            if (force || Math.abs(nextSpeed - this.currentSpeed) >= 0.05) {
+                this.setSpeed(nextSpeed, false, 'smart-pace');
+            }
+            HSE_UI.update();
+        },
+
+        getSmartPaceStatus() {
+            if (!this.smartPace.enabled) {
+                return `Current Speed: ${this.currentSpeed.toFixed(2)}x • Personal pace: ${this.getPersonalPace().toFixed(2)}x`;
+            }
+
+            const video = HSE_Intel.getVideo();
+            if (!video || !Number.isFinite(video.duration)) return 'Smart Pace active';
+
+            const remainingVideoSeconds = Math.max(0, video.duration - video.currentTime);
+            const remainingWallSeconds = Math.max(0, (this.smartPace.targetEndAt - Date.now()) / 1000);
+            const playbackMinutes = remainingVideoSeconds / Math.max(this.currentSpeed, 0.1) / 60;
+            const savedMinutes = Math.max(0, (remainingVideoSeconds / 60) - playbackMinutes);
+
+            if (remainingWallSeconds <= 0) return `Smart Pace: ${this.currentSpeed.toFixed(2)}x • catch-up mode`;
+
+            return `Smart Pace: ${this.currentSpeed.toFixed(2)}x • ${Math.ceil(remainingWallSeconds / 60)}m left • ~${Math.floor(savedMinutes)}m saved`;
+        },
+
         syncContentSpeed() {
             const info = HSE_Intel.getContentInfo();
             if (info.id === this.lastContentId) return;
+
+            if (this.smartPace.enabled) this.stopSmartPace(false);
+
             this.lastContentId = info.id;
             const saved = HSE_Store.getSpeedForShow(info.id);
-            this.setSpeed(saved, false);
+            this.setSpeed(saved, false, 'sync');
             HSE_UI.update();
         },
 
@@ -507,11 +646,15 @@
 
             this.syncContentSpeed();
 
-            const target = this.currentSpeed;
-            if (Math.abs(video.playbackRate - target) > 0.01) {
-                this.setSpeed(target, false);
+            if (this.smartPace.enabled) {
+                this.tickSmartPace();
+            } else {
+                const target = this.currentSpeed;
+                if (Math.abs(video.playbackRate - target) > 0.01) {
+                    this.setSpeed(target, false, 'enforce');
+                }
             }
-            HSE_UI.updateStatus();
+            HSE_UI.updateStatus(this.getSmartPaceStatus());
         }
     };
 
@@ -542,11 +685,21 @@
         },
 
         toggle() {
-            if (this.panel) {
-                this.remove();
-            } else {
-                this.build();
-            }
+            if (this.panel) this.remove();
+            else this.build();
+        },
+
+        makeButton(label, className, onClick) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = className;
+            btn.textContent = label;
+            btn.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onClick();
+            });
+            return btn;
         },
 
         build() {
@@ -560,7 +713,6 @@
             panel.id = 'hs-speed-panel';
             panel.className = 'mode-vod';
 
-            // Build with DOM APIs — never interpolate page titles into innerHTML (XSS / leak surface).
             const header = document.createElement('div');
             header.id = 'hs-speed-header';
 
@@ -572,28 +724,24 @@
             badge.className = 'hse-badge';
             badge.textContent = Platform.label;
 
-            const settingsBtn = document.createElement('span');
+            const settingsBtn = document.createElement('button');
+            settingsBtn.type = 'button';
             settingsBtn.className = 'hs-speed-settings-icon';
-            settingsBtn.innerHTML = '&#9881;';
+            settingsBtn.textContent = '⚙';
             settingsBtn.title = 'Open Settings';
             settingsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 try {
                     if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-                        chrome.runtime.sendMessage({ action: 'openOptionsPage' }).catch(err => {
-                            console.warn('OTT SPEED PLAYBACK: Failed to open options page.', err);
-                        });
+                        chrome.runtime.sendMessage({ action: 'openOptionsPage' }).catch(() => {});
                     }
-                } catch (err) {
-                    console.warn('OTT SPEED PLAYBACK: Cannot open options page, context invalidated.', err);
-                }
+                } catch (_) {}
             });
 
             const badgesContainer = document.createElement('div');
             badgesContainer.className = 'hse-badges-container';
             badgesContainer.appendChild(badge);
             badgesContainer.appendChild(settingsBtn);
-
             header.appendChild(titleEl);
             header.appendChild(badgesContainer);
 
@@ -601,31 +749,100 @@
             status.id = 'hs-speed-status';
             status.textContent = 'Initialising...';
 
+            const goalCard = document.createElement('div');
+            goalCard.className = 'hse-goal-card';
+
+            const goalTitle = document.createElement('div');
+            goalTitle.className = 'hse-goal-title';
+            goalTitle.textContent = '⚡ Smart Pace';
+
+            const goalHint = document.createElement('div');
+            goalHint.className = 'hse-goal-hint';
+            goalHint.textContent = 'Tell us how much time you have. Playback speed adapts to hit the target.';
+
+            const quickRow = document.createElement('div');
+            quickRow.className = 'hse-goal-quick-row';
+            [20, 30, 45, 60].forEach((minutes) => {
+                const btn = this.makeButton(`${minutes}m`, 'hse-goal-quick-btn', () => {
+                    const input = panel.querySelector('#hse-finish-minutes');
+                    if (input) input.value = String(minutes);
+                    HSE_Engine.startSmartPace(minutes);
+                    this.resetHideTimer();
+                });
+                btn.dataset.minutes = String(minutes);
+                quickRow.appendChild(btn);
+            });
+
+            const goalControls = document.createElement('div');
+            goalControls.className = 'hse-goal-controls';
+
+            const finishInput = document.createElement('input');
+            finishInput.id = 'hse-finish-minutes';
+            finishInput.type = 'number';
+            finishInput.min = '1';
+            finishInput.max = '600';
+            finishInput.step = '1';
+            finishInput.value = String(HSE_Store.customSettings.finishMinutes || DEFAULT_FINISH_MINUTES);
+            finishInput.setAttribute('aria-label', 'Finish in minutes');
+
+            const finishLabel = document.createElement('span');
+            finishLabel.className = 'hse-minutes-label';
+            finishLabel.textContent = 'min';
+
+            const startBtn = this.makeButton('Start', 'hse-start-btn', () => {
+                HSE_Engine.startSmartPace(finishInput.value);
+                this.resetHideTimer();
+            });
+
+            const stopBtn = this.makeButton('Stop', 'hse-stop-btn', () => {
+                HSE_Engine.stopSmartPace(true);
+                this.resetHideTimer();
+            });
+
+            goalControls.appendChild(finishInput);
+            goalControls.appendChild(finishLabel);
+            goalControls.appendChild(startBtn);
+            goalControls.appendChild(stopBtn);
+            goalCard.appendChild(goalTitle);
+            goalCard.appendChild(goalHint);
+            goalCard.appendChild(quickRow);
+            goalCard.appendChild(goalControls);
+
+            const separator = document.createElement('div');
+            separator.className = 'hse-section-label';
+            separator.textContent = 'Manual speed';
+
             const btnContainer = document.createElement('div');
             btnContainer.className = 'hs-speed-btn-container';
 
             DEFAULT_SPEEDS.forEach((s) => {
                 const btn = document.createElement('button');
+                btn.type = 'button';
                 btn.className = 'hs-speed-btn';
-                if (Math.abs(s - HSE_Engine.currentSpeed) < 0.01) {
-                    btn.classList.add('is-active');
-                }
+                if (Math.abs(s - HSE_Engine.currentSpeed) < 0.01) btn.classList.add('is-active');
                 btn.dataset.speed = String(s);
                 btn.textContent = `${s}x`;
                 btn.onclick = () => {
+                    if (HSE_Engine.smartPace.enabled) HSE_Engine.stopSmartPace(false);
                     HSE_Engine.setSpeed(parseFloat(btn.dataset.speed));
                     this.resetHideTimer();
                 };
                 btnContainer.appendChild(btn);
             });
 
+            const personalHint = document.createElement('div');
+            personalHint.id = 'hse-personal-hint';
+            personalHint.textContent = `Personal pace learned locally: ${HSE_Store.getPersonalPace().toFixed(2)}x`;
+
             panel.appendChild(header);
             panel.appendChild(status);
+            panel.appendChild(goalCard);
+            panel.appendChild(separator);
             panel.appendChild(btnContainer);
-
+            panel.appendChild(personalHint);
             document.body.appendChild(panel);
             this.panel = panel;
-
+            this.update();
             this.resetHideTimer();
         },
 
@@ -635,17 +852,23 @@
             this.panel.querySelectorAll('.hs-speed-btn').forEach((btn) => {
                 btn.classList.toggle('is-active', Math.abs(parseFloat(btn.dataset.speed) - speed) < 0.01);
             });
+            this.panel.classList.toggle('hse-smart-active', HSE_Engine.smartPace.enabled);
+
             const titleEl = document.getElementById('hs-speed-title');
-            if (titleEl) {
-                titleEl.textContent = HSE_Intel.getContentInfo().title;
-            }
+            if (titleEl) titleEl.textContent = HSE_Intel.getContentInfo().title;
+
+            const hint = document.getElementById('hse-personal-hint');
+            if (hint) hint.textContent = `Personal pace learned locally: ${HSE_Store.getPersonalPace().toFixed(2)}x`;
+
+            const startBtn = this.panel.querySelector('.hse-start-btn');
+            const stopBtn = this.panel.querySelector('.hse-stop-btn');
+            if (startBtn) startBtn.disabled = HSE_Engine.smartPace.enabled;
+            if (stopBtn) stopBtn.disabled = !HSE_Engine.smartPace.enabled;
         },
 
         updateStatus(text) {
             const status = document.getElementById('hs-speed-status');
-            if (status) {
-                status.textContent = text || `Current Speed: ${HSE_Engine.currentSpeed}x`;
-            }
+            if (status) status.textContent = text || HSE_Engine.getSmartPaceStatus();
         },
 
         resetHideTimer() {
@@ -655,7 +878,7 @@
                     this.panel.classList.add('fade-out');
                     setTimeout(() => this.remove(), 400);
                 }
-            }, 4000);
+            }, 6000);
         },
 
         remove() {
@@ -690,7 +913,7 @@
                 if (keyName === custom.keySmartSpeed && !this.isSmartSpeedActive && !e.repeat) {
                     this.isSmartSpeedActive = true;
                     this.preSmartSpeed = HSE_Engine.currentSpeed;
-                    HSE_Engine.setSpeed(custom.smartSpeedValue, false);
+                    HSE_Engine.setSpeed(custom.smartSpeedValue, false, 'smart-speed');
                     HSE_UI.flash(`Fast Forward ${custom.smartSpeedValue}x`, true);
                     return;
                 }
@@ -718,7 +941,7 @@
 
                 if (keyName === custom.keySmartSpeed && this.isSmartSpeedActive) {
                     this.isSmartSpeedActive = false;
-                    HSE_Engine.setSpeed(this.preSmartSpeed, false);
+                    HSE_Engine.setSpeed(this.preSmartSpeed, false, 'smart-speed-stop');
                     HSE_UI.flash(`${this.preSmartSpeed}x`);
                 }
             });
@@ -733,7 +956,7 @@
 
         setInterval(() => {
             HSE_Engine.enforce();
-        }, REFRESH_MS);
+        }, Math.min(REFRESH_MS, SMART_PACE_TICK_MS));
 
         const loadInitialSpeed = () => {
             HSE_Engine.lastContentId = null;
