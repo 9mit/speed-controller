@@ -1,9 +1,13 @@
 {
   "manifest_version": 3,
   "name": "OTT SPEED PLAYBACK",
-  "version": "2.1",
-  "description": "Adjust playback speed with custom rate controls, keyboard shortcuts, and saved speed preferences on popular streaming services.",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "version": "3.0",
+  "description": "Finish videos in the time you have with adaptive playback speed and local personal pace memory.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
   "host_permissions": [
     "https://*.hotstar.com/*",
     "https://*.jiohotstar.com/*",
@@ -60,8 +64,12 @@
         "https://*.amazon.com.br/gp/video/*",
         "https://*.amazon.com.mx/gp/video/*"
       ],
-      "css": ["styles.css"],
-      "js": ["content.js"],
+      "css": [
+        "styles.css"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
