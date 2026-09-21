@@ -1,5 +1,5 @@
 # OTT SPEED PLAYBACK
-### Adjust playback speed with custom rate controls, keyboard shortcuts, and saved speed preferences on popular streaming services.
+### Finish videos in the time you have with adaptive playback speed, per-title preferences, and a private local pace profile.
 
 <img src="icon128.png" width="128" height="128" alt="OTT SPEED PLAYBACK Logo">
 
@@ -17,6 +17,8 @@ OTT SPEED PLAYBACK is a browser extension for playback rate control on **Disney+
 - **Speed presets**: Overlay controls for 1x, 1.5x, 2x, and 2.5x.
 - **Keyboard**: `[` / `]` adjust speed by 0.1 (up to 16x).
 - **Per-title memory**: Remembers your preferred speed per show/movie (namespaced per platform).
+- **Smart Pace**: Set a target such as 20, 30, 45, or 60 minutes and the extension continuously adjusts playback to hit the finish target.
+- **Personal pace memory**: Learns your preferred playback speed locally on-device and uses it as the default for new videos.
 - **SPA-aware**: Reloads settings on client-side navigation (`pushState` / `replaceState` / `popstate`).
 - **Shadow DOM video discovery**: Finds player `<video>` elements inside open shadow roots (needed on Netflix).
 
@@ -54,6 +56,10 @@ Supported hosts:
 - `*.mxplayer.in`
 
 ---
+
+## Smart Pace
+
+Smart Pace calculates the playback rate needed to finish the remaining video by the selected local deadline. It never sends viewing data to a server. If the required speed exceeds the 16x safety limit, the extension refuses to start Smart Pace rather than silently failing the target.
 
 ## Technical notes
 
