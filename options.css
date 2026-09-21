@@ -1,47 +1,52 @@
 :root {
     --hse-accent: #1f80e0;
+    --hse-accent-hover: #3a97f7;
     --hse-success: #0bb36f;
     --hse-warning: #ffcc00;
     --hse-danger: #ff4d4d;
     --hse-bg: #091830;
-    --hse-panel-bg: rgba(16, 33, 62, 0.75);
+    --hse-panel-bg: rgba(16, 33, 62, 0.85);
     --hse-glass-border: rgba(255, 255, 255, 0.15);
     --hse-text: #ffffff;
     --hse-text-dim: rgba(255, 255, 255, 0.7);
     --hse-radius: 16px;
+    --hse-font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+    box-sizing: border-box;
 }
 
 body {
     margin: 0;
-    padding: 40px 20px;
+    padding: 36px 20px;
     background: var(--hse-bg);
     color: var(--hse-text);
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: var(--hse-font-family);
     display: flex;
     justify-content: center;
     min-height: 100vh;
-    box-sizing: border-box;
 }
 
 .glass-panel {
     background: var(--hse-panel-bg);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
-    padding: 32px;
+    padding: 28px 32px;
     border-radius: var(--hse-radius);
     border: 1px solid var(--hse-glass-border);
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
     width: 100%;
-    max-width: 500px;
+    max-width: 550px;
 }
 
 header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 32px;
+    margin-bottom: 24px;
     border-bottom: 1px solid var(--hse-glass-border);
-    padding-bottom: 24px;
+    padding-bottom: 18px;
 }
 
 .logo {
@@ -57,7 +62,7 @@ header {
 
 .logo h1 {
     margin: 0;
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 800;
 }
 
@@ -68,7 +73,7 @@ header {
 }
 
 .badge {
-    background: var(--hse-accent);
+    background: linear-gradient(135deg, var(--hse-accent), #9d4edd);
     color: white;
     font-size: 11px;
     font-weight: 800;
@@ -80,28 +85,28 @@ header {
 }
 
 .settings-group {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
 }
 
 .settings-group h2 {
-    font-size: 16px;
-    margin: 0 0 8px;
-    font-weight: 600;
+    font-size: 15px;
+    margin: 0 0 4px;
+    font-weight: 700;
     color: var(--hse-accent);
 }
 
 .section-desc {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--hse-text-dim);
-    margin: 0 0 16px;
+    margin: 0 0 12px;
 }
 
 .setting-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .setting-item:last-child {
@@ -113,18 +118,68 @@ header {
     font-weight: 500;
 }
 
-.hotkey-input, .select-input {
+.sub-label {
+    font-size: 11px;
+    color: var(--hse-text-dim);
+    margin-top: 2px;
+}
+
+.pace-reset-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pace-badge {
+    background: rgba(31, 128, 224, 0.2);
+    border: 1px solid rgba(31, 128, 224, 0.4);
+    color: #9cd0ff;
+    font-size: 14px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+
+.mini-danger-btn {
+    appearance: none;
+    background: rgba(255, 77, 77, 0.15);
+    border: 1px solid rgba(255, 77, 77, 0.4);
+    color: #ff9999;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mini-danger-btn:hover {
+    background: rgba(255, 77, 77, 0.35);
+    color: #ffffff;
+}
+
+.checkbox-input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--hse-accent);
+    cursor: pointer;
+}
+
+.hotkey-input, .select-input, .text-input {
     appearance: none;
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--hse-glass-border);
     color: var(--hse-text);
     padding: 8px 12px;
     border-radius: 8px;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.hotkey-input {
     font-family: monospace;
-    font-size: 14px;
     width: 120px;
     text-align: center;
-    transition: all 0.2s ease;
     cursor: pointer;
 }
 
@@ -141,10 +196,28 @@ header {
     color: var(--hse-warning);
 }
 
+.hotkey-input.collision {
+    border-color: var(--hse-danger);
+    box-shadow: 0 0 0 3px rgba(255, 77, 77, 0.25);
+    color: var(--hse-danger);
+}
+
+.collision-alert {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(255, 77, 77, 0.15);
+    border: 1px solid rgba(255, 77, 77, 0.4);
+    border-radius: 8px;
+    color: #ff9999;
+    font-size: 12px;
+    font-weight: 500;
+}
+
 .select-input {
-    width: 146px;
+    width: 160px;
     font-family: inherit;
     text-align: left;
+    cursor: pointer;
 }
 
 .select-input option {
@@ -152,16 +225,49 @@ header {
     color: var(--hse-text);
 }
 
+.text-input {
+    width: 200px;
+    text-align: left;
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: var(--hse-accent);
+    box-shadow: 0 0 0 3px rgba(31, 128, 224, 0.25);
+}
+
+.info-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--hse-glass-border);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--hse-text-dim);
+}
+
+kbd {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--hse-glass-border);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #ffffff;
+}
+
 footer {
     display: flex;
     gap: 12px;
-    margin-top: 40px;
+    margin-top: 28px;
 }
 
 .primary-btn, .secondary-btn {
     appearance: none;
     border: none;
-    padding: 12px 24px;
+    padding: 12px 20px;
     border-radius: 8px;
     font-weight: 600;
     font-size: 14px;
@@ -177,12 +283,13 @@ footer {
 }
 
 .primary-btn:hover {
+    background: var(--hse-accent-hover);
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(31, 128, 224, 0.4);
 }
 
 .secondary-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
     color: var(--hse-text);
     border: 1px solid var(--hse-glass-border);
 }
@@ -193,15 +300,22 @@ footer {
 
 .status-message {
     text-align: center;
-    margin-top: 16px;
+    margin-top: 14px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     min-height: 20px;
-    color: var(--hse-success);
     opacity: 0;
     transition: opacity 0.3s ease;
 }
 
 .status-message.show {
     opacity: 1;
+}
+
+.status-message.success {
+    color: var(--hse-success);
+}
+
+.status-message.info {
+    color: #a5d2ff;
 }

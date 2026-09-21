@@ -3,83 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OTT SPEED PLAYBACK - Settings</title>
+    <title>OTT SPEED PLAYBACK - Preferences</title>
     <link rel="stylesheet" href="options.css">
 </head>
 <body>
-    <div class="glass-panel">
+    <main class="glass-panel">
         <header>
             <div class="logo">
-                <img src="icon48.png" alt="Logo" width="48" height="48">
+                <img src="icon48.png" alt="OTT Speed Playback Logo" width="48" height="48">
                 <div>
                     <h1>OTT SPEED PLAYBACK</h1>
-                    <p>Feature Configuration</p>
+                    <p>Playback Autopilot &amp; Preferences</p>
                 </div>
             </div>
-            <span class="badge">PRO</span>
+            <span class="badge">v4.0 AUTOPILOT</span>
         </header>
 
-        <section class="settings-group">
-            <h2>Keyboard Shortcuts</h2>
-            <p class="section-desc">Click on an input field and press a key to rebind it.</p>
+        <!-- Smart Pace Configuration (Feature 6, 8, 13) -->
+        <section class="settings-group" aria-labelledby="heading-smart-pace">
+            <h2 id="heading-smart-pace">⚡ Smart Pace Autopilot</h2>
+            <p class="section-desc">Automatically adjusts speed dynamically to finish video by target time.</p>
+
+            <div class="setting-item">
+                <label for="defaultFinishTarget">Default Finish Target</label>
+                <select id="defaultFinishTarget" class="select-input" aria-label="Default Finish Target">
+                    <option value="20">20 minutes</option>
+                    <option value="30" selected>30 minutes</option>
+                    <option value="45">45 minutes</option>
+                    <option value="60">60 minutes</option>
+                    <option value="90">90 minutes</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label for="adaptiveEnabled">Content-Aware Speed Variation</label>
+                <input type="checkbox" id="adaptiveEnabled" checked class="checkbox-input" aria-label="Enable content-aware speed variation">
+            </div>
+
+            <div class="setting-item">
+                <label for="learnOverrides">Learn From Manual Choices</label>
+                <input type="checkbox" id="learnOverrides" checked class="checkbox-input" aria-label="Learn from manual choices">
+            </div>
+
+            <div class="setting-item">
+                <div>
+                    <label>Learned Personal Pace</label>
+                    <p class="sub-label">Used by "Use my pace" action</p>
+                </div>
+                <div class="pace-reset-wrap">
+                    <span id="personalPaceDisplay" class="pace-badge">1.65x</span>
+                    <button id="resetPaceBtn" class="mini-danger-btn" title="Reset learned pace to 1.65x">Reset Pace</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Speed Tuning Section -->
+        <section class="settings-group" aria-labelledby="heading-tuning">
+            <h2 id="heading-tuning">Playback &amp; Presets</h2>
+            <p class="section-desc">Customize step increments and on-screen preset buttons.</p>
+
+            <div class="setting-item">
+                <label for="speedStep">Speed Step Increment</label>
+                <select id="speedStep" class="select-input" aria-label="Speed Step Increment">
+                    <option value="0.05">0.05x (Fine)</option>
+                    <option value="0.1" selected>0.10x (Standard)</option>
+                    <option value="0.2">0.20x</option>
+                    <option value="0.25">0.25x (Quarter)</option>
+                    <option value="0.5">0.50x (Fast)</option>
+                </select>
+            </div>
+
+            <div class="setting-item">
+                <label for="speedPresets">Speed Presets (comma-separated)</label>
+                <input type="text" id="speedPresets" class="text-input" value="1, 1.25, 1.5, 1.75, 2, 2.5" aria-label="Speed presets comma separated">
+            </div>
+        </section>
+
+        <!-- Keyboard Shortcuts Section -->
+        <section class="settings-group" aria-labelledby="heading-shortcuts">
+            <h2 id="heading-shortcuts">Keyboard Shortcuts</h2>
+            <p class="section-desc">Click any input box and press a key to rebind it.</p>
             
             <div class="setting-item">
-                <label for="keySpeedUp">Speed Up (+0.1x)</label>
-                <input type="text" id="keySpeedUp" readonly class="hotkey-input">
+                <label for="keySpeedUp">Speed Up</label>
+                <input type="text" id="keySpeedUp" readonly class="hotkey-input" aria-label="Speed Up Key">
             </div>
             
             <div class="setting-item">
-                <label for="keySpeedDown">Speed Down (-0.1x)</label>
-                <input type="text" id="keySpeedDown" readonly class="hotkey-input">
+                <label for="keySpeedDown">Speed Down</label>
+                <input type="text" id="keySpeedDown" readonly class="hotkey-input" aria-label="Speed Down Key">
             </div>
 
             <div class="setting-item">
                 <label for="keyReset">Reset Speed (1.0x)</label>
-                <input type="text" id="keyReset" readonly class="hotkey-input">
+                <input type="text" id="keyReset" readonly class="hotkey-input" aria-label="Reset Speed Key">
             </div>
-        </section>
 
-        <section class="settings-group">
-            <h2>Media Controls</h2>
-            
             <div class="setting-item">
                 <label for="keySkipForward">Skip Forward (10s)</label>
-                <input type="text" id="keySkipForward" readonly class="hotkey-input">
+                <input type="text" id="keySkipForward" readonly class="hotkey-input" aria-label="Skip Forward Key">
             </div>
             
             <div class="setting-item">
                 <label for="keySkipBack">Rewind (10s)</label>
-                <input type="text" id="keySkipBack" readonly class="hotkey-input">
+                <input type="text" id="keySkipBack" readonly class="hotkey-input" aria-label="Rewind Key">
+            </div>
+
+            <div id="collisionAlert" class="collision-alert" role="alert" style="display: none;">
+                Warning: Multiple actions share the same hotkey!
             </div>
         </section>
 
-        <section class="settings-group">
-            <h2>Smart Speed</h2>
-            <p class="section-desc">Hold this key to temporarily fast-forward.</p>
+        <!-- Smart Speed Section (Temporary Fast Forward) -->
+        <section class="settings-group" aria-labelledby="heading-smart-speed">
+            <h2 id="heading-smart-speed">Temporary Smart Speed (Hold Key)</h2>
+            <p class="section-desc">Hold this key to temporarily fast-forward through recaps.</p>
             
             <div class="setting-item">
                 <label for="keySmartSpeed">Smart Speed Key</label>
-                <input type="text" id="keySmartSpeed" readonly class="hotkey-input">
+                <input type="text" id="keySmartSpeed" readonly class="hotkey-input" aria-label="Smart Speed Key">
             </div>
 
             <div class="setting-item">
-                <label for="smartSpeedValue">Smart Speed Multiplier</label>
-                <select id="smartSpeedValue" class="select-input">
-                    <option value="1.5">1.5x</option>
-                    <option value="2.0">2.0x</option>
-                    <option value="2.5">2.5x</option>
-                    <option value="3.0">3.0x</option>
-                    <option value="4.0">4.0x</option>
+                <label for="smartSpeedValue">Fast-Forward Rate</label>
+                <select id="smartSpeedValue" class="select-input" aria-label="Smart Speed Multiplier">
+                    <option value="1.5">1.50x</option>
+                    <option value="1.75">1.75x</option>
+                    <option value="2.0">2.00x (Default)</option>
+                    <option value="2.5">2.50x</option>
+                    <option value="3.0">3.00x</option>
+                    <option value="4.0">4.00x</option>
                 </select>
             </div>
         </section>
 
+        <!-- Global Command Reference -->
+        <section class="settings-group" aria-labelledby="heading-global-command">
+            <h2 id="heading-global-command">Global Browser Command</h2>
+            <div class="info-box">
+                <span>Toggle Overlay in Tab:</span>
+                <kbd>Alt+Shift+S</kbd>
+            </div>
+        </section>
+
+        <!-- Actions -->
         <footer>
-            <button id="saveBtn" class="primary-btn">Save Changes</button>
+            <button id="saveBtn" class="primary-btn">Save Preferences</button>
             <button id="resetBtn" class="secondary-btn">Reset Defaults</button>
         </footer>
-        <div id="statusMessage" class="status-message"></div>
-    </div>
+        <div id="statusMessage" class="status-message" aria-live="polite"></div>
+    </main>
     <script src="options.js"></script>
 </body>
 </html>
