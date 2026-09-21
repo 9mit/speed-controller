@@ -322,15 +322,27 @@
         },
 
         getVideo() {
-            if (this.cachedVideo && this.cachedVideo.isConnected) {
-                return this.cachedVideo;
+            const all = collectVideos(document, []);
+            // Prioritize actively playing video element
+            const playing = all.find(v => v.isConnected && !v.paused && v.readyState >= 1);
+            if (playing) {
+                if (this.cachedVideo !== playing) {
+                    this.cachedVideo = playing;
+                    this.attachVideoListeners(playing);
+                }
+                return playing;
             }
-            const found = pickActiveVideo(collectVideos(document, []));
-            if (found) {
-                this.cachedVideo = found;
-                this.attachVideoListeners(found);
+
+            const best = pickActiveVideo(all);
+            if (best) {
+                if (this.cachedVideo !== best) {
+                    this.cachedVideo = best;
+                    this.attachVideoListeners(best);
+                }
+                return best;
             }
-            return found;
+
+            return this.cachedVideo && this.cachedVideo.isConnected ? this.cachedVideo : null;
         },
 
         attachVideoListeners(video) {
@@ -1002,16 +1014,18 @@
                 document.documentElement.dataset.hsePlaybackRate = String(clamped);
             }
 
-            const video = HSE_Intel.getVideo();
-            if (video) {
-                try {
-                    if (Math.abs(video.playbackRate - clamped) > 0.01) {
-                        video.playbackRate = clamped;
-                    }
-                    if (Math.abs(video.defaultPlaybackRate - clamped) > 0.01) {
-                        video.defaultPlaybackRate = clamped;
-                    }
-                } catch (_) {}
+            const allVideos = collectVideos(document, []);
+            for (const video of allVideos) {
+                if (video && video.isConnected) {
+                    try {
+                        if (Math.abs(video.playbackRate - clamped) > 0.01) {
+                            video.playbackRate = clamped;
+                        }
+                        if (Math.abs(video.defaultPlaybackRate - clamped) > 0.01) {
+                            video.defaultPlaybackRate = clamped;
+                        }
+                    } catch (_) {}
+                }
             }
 
             if (isPersistent) {
@@ -1047,14 +1061,16 @@
                 this.syncContentSpeed();
             }
 
-            const video = HSE_Intel.getVideo();
-            if (!video) return;
-
             const target = this.currentSpeed;
-            if (Math.abs(video.playbackRate - target) > 0.01) {
-                try {
-                    video.playbackRate = target;
-                } catch (_) {}
+            const allVideos = collectVideos(document, []);
+            for (const video of allVideos) {
+                if (video && video.isConnected) {
+                    try {
+                        if (Math.abs(video.playbackRate - target) > 0.01) {
+                            video.playbackRate = target;
+                        }
+                    } catch (_) {}
+                }
             }
             HSE_UI.updateStatus();
         }
