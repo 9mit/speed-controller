@@ -42,11 +42,11 @@
     // --- Active Speed State Helper ---
     function getActiveSpeed() {
         const datasetSpeed = parseFloat(document.documentElement?.dataset?.hsePlaybackRate);
-        if (Number.isFinite(datasetSpeed) && datasetSpeed > 0) {
+        if (Number.isFinite(datasetSpeed) && datasetSpeed >= 0.1 && datasetSpeed <= 16) {
             return datasetSpeed;
         }
         const video = findActiveVideo();
-        if (video && Number.isFinite(video.playbackRate) && video.playbackRate > 0) {
+        if (video && Number.isFinite(video.playbackRate) && video.playbackRate >= 0.1 && video.playbackRate <= 16) {
             return video.playbackRate;
         }
         return 1.0;

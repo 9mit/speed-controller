@@ -1,15 +1,16 @@
 # Privacy Policy for OTT SPEED PLAYBACK
 
-Last updated: September 2026 (Version 4.0.0)
+Last updated: September 2026 (Version 4.1.0)
 
-**OTT SPEED PLAYBACK** ("the Extension") is committed to protecting your privacy. This Privacy Policy explains our local-only data handling and disclosure practices.
+**OTT SPEED PLAYBACK** ("the Extension") is committed to protecting your privacy under a strict Zero-Trust model. This Privacy Policy explains our local-only data handling and disclosure practices.
 
 ## 1. Local Autopilot & Zero Remote Services
 The Extension **does not collect, transmit, distribute, log, or sell any personal data**.
 All Smart Pace Autopilot features, subtitle frequency heuristics, and speech density calculations operate **strictly locally on your device** inside the browser.
 The Extension:
 - Does NOT use any remote AI services, cloud speech APIs, or external servers.
-- Does NOT record, log, or transmit audio streams or subtitle text.
+- Does NOT record, log, or transmit audio streams or video data.
+- Does NOT persist raw subtitle text. Captions are converted in-memory to anonymous numeric signals (words per minute) and immediately discarded.
 - Does NOT include any analytics, trackers, telemetry, or remote tracking scripts.
 
 ## 2. Local Storage

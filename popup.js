@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderPresets(presets) {
-        presetsGrid.innerHTML = '';
+        presetsGrid.replaceChildren();
         presets.forEach((preset) => {
             const chip = document.createElement('button');
             chip.className = 'preset-chip';

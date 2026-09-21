@@ -1,10 +1,11 @@
 {
   "name": "ott-speed-playback",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Smart playback autopilot with content-aware adaptive pace, finish-time targeting, and custom speed controls on streaming services.",
   "private": true,
   "scripts": {
-    "test": "node --check content.js background.js options.js popup.js main_world.js",
+    "test": "node --check content.js background.js options.js popup.js main_world.js && node scripts/test_security.js",
+    "generate-icons": "node scripts/generate_icons.js",
     "pack": "node scripts/pack.js",
     "zip": "node scripts/pack.js"
   },

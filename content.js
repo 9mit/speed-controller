@@ -1,6 +1,7 @@
 /**
- * OTT SPEED PLAYBACK (v4.0.0)
+ * OTT SPEED PLAYBACK (v4.1.0)
  * Content-Aware Adaptive Pace Engine & Playback Autopilot
+ * Hardened with Zero-Trust Subtitle Privacy and Strict DOM/Message Boundaries
  */
 (function () {
     'use strict';
@@ -358,10 +359,10 @@
         }
     };
 
-    // --- FEATURE 1, 2, 3: HSE_Analyzer (Content & Subtitle Intelligence) ---
+    // --- FEATURE 1, 2, 3: HSE_Analyzer (Content & Subtitle Intelligence - Zero-Trust Privacy) ---
     const HSE_Analyzer = {
-        captionHistory: [], // { time, text, words }
-        lastText: '',
+        captionHistory: [], // Only stores numeric { time, words } - raw subtitle text is NEVER stored
+        lastCaptionHash: 0,
         lastCaptionTimestamp: 0,
         silenceDurationSec: 0,
         lastAnalysisTime: 0,
@@ -377,13 +378,22 @@
                 const subEl = HSE_Intel.findSubtitleElement();
                 if (!subEl) return;
                 const text = (subEl.textContent || '').trim();
+                if (!text) return;
                 const now = Date.now();
 
-                if (text && text !== this.lastText) {
-                    this.lastText = text;
+                // Compute 32-bit hash for change detection without retaining the raw subtitle string in memory
+                let hash = 5381;
+                for (let i = 0; i < text.length; i++) {
+                    hash = ((hash << 5) + hash) + text.charCodeAt(i);
+                    hash = hash & hash;
+                }
+
+                if (hash !== this.lastCaptionHash) {
+                    this.lastCaptionHash = hash;
                     this.lastCaptionTimestamp = now;
                     const words = text.split(/\s+/).filter(Boolean).length;
-                    this.captionHistory.push({ time: now, text, words });
+                    // Retain ONLY numeric metrics - discard raw text immediately
+                    this.captionHistory.push({ time: now, words });
                     // Keep last 30 seconds of history
                     const cutoff = now - 30000;
                     this.captionHistory = this.captionHistory.filter(c => c.time >= cutoff);
@@ -541,35 +551,73 @@
         hydrateFromStorage(raw, customRaw, paceRaw) {
             if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
                 if (typeof raw.globalSpeed === 'number') this.settings.globalSpeed = sanitizeSpeed(raw.globalSpeed, 1);
-                if (Array.isArray(raw.presets) && raw.presets.length) this.settings.presets = raw.presets.map((p) => sanitizeSpeed(p)).filter(Boolean);
-                if (typeof raw.speedStep === 'number' && raw.speedStep > 0) this.settings.speedStep = Math.max(0.01, Math.min(1, raw.speedStep));
-                if (typeof raw.defaultFinishTarget === 'number') this.settings.defaultFinishTarget = Math.max(1, raw.defaultFinishTarget);
+                if (Array.isArray(raw.presets) && raw.presets.length) {
+                    const validPresets = raw.presets
+                        .map(p => (typeof p === 'number' && Number.isFinite(p) && p >= 0.1 && p <= 16) ? sanitizeSpeed(p) : null)
+                        .filter(n => n !== null);
+                    if (validPresets.length) this.settings.presets = validPresets;
+                }
+                if (typeof raw.speedStep === 'number' && Number.isFinite(raw.speedStep) && raw.speedStep > 0) {
+                    this.settings.speedStep = Math.max(0.01, Math.min(1, raw.speedStep));
+                }
+                if (typeof raw.defaultFinishTarget === 'number' && Number.isFinite(raw.defaultFinishTarget)) {
+                    this.settings.defaultFinishTarget = Math.max(1, Math.min(600, Math.floor(raw.defaultFinishTarget)));
+                }
                 if (typeof raw.adaptiveEnabled === 'boolean') this.settings.adaptiveEnabled = raw.adaptiveEnabled;
                 if (typeof raw.learnOverrides === 'boolean') this.settings.learnOverrides = raw.learnOverrides;
 
                 const speeds = raw.showSpeeds;
                 if (speeds && typeof speeds === 'object' && !Array.isArray(speeds)) {
-                    const cleaned = {};
+                    const cleaned = Object.create(null);
                     for (const [key, value] of Object.entries(speeds)) {
                         if (typeof key !== 'string' || key.length > 64) continue;
+                        if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
                         if (!/^[a-z0-9:_-]+$/i.test(key)) continue;
-                        if (typeof value !== 'number') continue;
+                        if (typeof value !== 'number' || !Number.isFinite(value)) continue;
                         cleaned[key] = sanitizeSpeed(value);
                     }
                     this.settings.showSpeeds = cleaned;
                 }
             }
 
-            if (customRaw && typeof customRaw === 'object') {
-                this.customSettings = { ...this.customSettings, ...customRaw };
-                this.customSettings.smartSpeedValue = parseFloat(this.customSettings.smartSpeedValue) || 2.0;
+            if (customRaw && typeof customRaw === 'object' && !Array.isArray(customRaw)) {
+                const allowedKeys = ['keySpeedUp', 'keySpeedDown', 'keyReset', 'keySkipForward', 'keySkipBack', 'keySmartSpeed'];
+                for (const key of allowedKeys) {
+                    if (typeof customRaw[key] === 'string' && customRaw[key].length > 0 && customRaw[key].length <= 32) {
+                        this.customSettings[key] = customRaw[key];
+                    }
+                }
+                if (customRaw.smartSpeedValue !== undefined) {
+                    this.customSettings.smartSpeedValue = sanitizeSpeed(customRaw.smartSpeedValue, 2.0);
+                }
             }
 
-            if (paceRaw && typeof paceRaw === 'object') {
+            if (paceRaw && typeof paceRaw === 'object' && !Array.isArray(paceRaw)) {
                 if (typeof paceRaw.globalAverage === 'number') this.paceProfile.globalAverage = sanitizeSpeed(paceRaw.globalAverage, 1.65);
-                if (typeof paceRaw.sampleCount === 'number') this.paceProfile.sampleCount = paceRaw.sampleCount;
-                if (paceRaw.platforms && typeof paceRaw.platforms === 'object') this.paceProfile.platforms = paceRaw.platforms;
-                if (paceRaw.behavior && typeof paceRaw.behavior === 'object') this.paceProfile.behavior = { ...this.paceProfile.behavior, ...paceRaw.behavior };
+                if (typeof paceRaw.sampleCount === 'number' && Number.isFinite(paceRaw.sampleCount) && paceRaw.sampleCount > 0) {
+                    this.paceProfile.sampleCount = Math.min(100000, Math.max(1, Math.floor(paceRaw.sampleCount)));
+                }
+                if (paceRaw.platforms && typeof paceRaw.platforms === 'object' && !Array.isArray(paceRaw.platforms)) {
+                    const cleanPlatforms = Object.create(null);
+                    const knownPlatforms = ['hotstar', 'netflix', 'prime', 'zee5', 'airtelxstream', 'jiocinema', 'sonyliv', 'aha', 'hoichoi', 'sunnxt', 'mxplayer'];
+                    for (const pid of knownPlatforms) {
+                        const plat = paceRaw.platforms[pid];
+                        if (plat && typeof plat === 'object' && typeof plat.averageSpeed === 'number') {
+                            cleanPlatforms[pid] = {
+                                averageSpeed: sanitizeSpeed(plat.averageSpeed, 1.65),
+                                sampleCount: (typeof plat.sampleCount === 'number' && Number.isFinite(plat.sampleCount)) ? Math.min(100000, Math.max(1, Math.floor(plat.sampleCount))) : 1
+                            };
+                        }
+                    }
+                    this.paceProfile.platforms = cleanPlatforms;
+                }
+                if (paceRaw.behavior && typeof paceRaw.behavior === 'object' && !Array.isArray(paceRaw.behavior)) {
+                    const b = paceRaw.behavior;
+                    if (typeof b.tolerance === 'number' && Number.isFinite(b.tolerance)) this.paceProfile.behavior.tolerance = Math.max(0.01, Math.min(1, b.tolerance));
+                    if (typeof b.preferredAcceleration === 'number' && Number.isFinite(b.preferredAcceleration)) this.paceProfile.behavior.preferredAcceleration = Math.max(0.1, Math.min(2, b.preferredAcceleration));
+                    if (typeof b.preferredMaxSpeed === 'number' && Number.isFinite(b.preferredMaxSpeed)) this.paceProfile.behavior.preferredMaxSpeed = sanitizeSpeed(b.preferredMaxSpeed, 2.8);
+                    if (typeof b.manualOverrides === 'number' && Number.isFinite(b.manualOverrides)) this.paceProfile.behavior.manualOverrides = Math.min(100000, Math.max(0, Math.floor(b.manualOverrides)));
+                }
             }
         },
 
@@ -1077,7 +1125,7 @@
 
             const dragIcon = document.createElement('span');
             dragIcon.className = 'hs-speed-drag-handle';
-            dragIcon.innerHTML = '&#8942;&#8942;';
+            dragIcon.textContent = '\u22EE\u22EE';
             dragIcon.title = 'Drag to reposition';
 
             const titleEl = document.createElement('span');
@@ -1096,7 +1144,7 @@
 
             const settingsBtn = document.createElement('button');
             settingsBtn.className = 'hs-speed-icon-btn';
-            settingsBtn.innerHTML = '&#9881;';
+            settingsBtn.textContent = '\u2699';
             settingsBtn.title = 'Settings';
             settingsBtn.setAttribute('aria-label', 'Open Settings');
             settingsBtn.addEventListener('click', (e) => {
@@ -1110,7 +1158,7 @@
 
             const closeBtn = document.createElement('button');
             closeBtn.className = 'hs-speed-icon-btn hs-speed-close-btn';
-            closeBtn.innerHTML = '&times;';
+            closeBtn.textContent = '\u00D7';
             closeBtn.title = 'Close Panel';
             closeBtn.setAttribute('aria-label', 'Close speed overlay');
             closeBtn.addEventListener('click', (e) => {
@@ -1161,13 +1209,24 @@
 
             const smartHeader = document.createElement('div');
             smartHeader.className = 'hs-smart-header';
-            smartHeader.innerHTML = `
-                <div class="hs-smart-title">
-                    <span class="hs-lightning">⚡</span>
-                    <span>SMART PACE</span>
-                </div>
-                <button id="hs-use-my-pace-btn" class="hs-pill-btn">Use my pace (${HSE_Store.getPersonalPace(Platform.id).toFixed(2)}x)</button>
-            `;
+
+            const smartTitle = document.createElement('div');
+            smartTitle.className = 'hs-smart-title';
+            const lightningSpan = document.createElement('span');
+            lightningSpan.className = 'hs-lightning';
+            lightningSpan.textContent = '\u26A1';
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = 'SMART PACE';
+            smartTitle.appendChild(lightningSpan);
+            smartTitle.appendChild(labelSpan);
+
+            const useMyPaceBtn = document.createElement('button');
+            useMyPaceBtn.id = 'hs-use-my-pace-btn';
+            useMyPaceBtn.className = 'hs-pill-btn';
+            useMyPaceBtn.textContent = `Use my pace (${HSE_Store.getPersonalPace(Platform.id).toFixed(2)}x)`;
+
+            smartHeader.appendChild(smartTitle);
+            smartHeader.appendChild(useMyPaceBtn);
 
             const promptText = document.createElement('div');
             promptText.className = 'hs-prompt-text';
@@ -1180,7 +1239,8 @@
                 chip.className = 'hs-chip-btn';
                 chip.textContent = `${min}m`;
                 chip.onclick = () => {
-                    document.getElementById('hs-custom-target-input').value = min;
+                    const input = document.getElementById('hs-custom-target-input');
+                    if (input) input.value = String(min);
                     HSE_AdaptiveEngine.start(min);
                     this.resetHideTimer();
                 };
@@ -1189,30 +1249,60 @@
 
             const inputRow = document.createElement('div');
             inputRow.className = 'hs-input-row';
-            inputRow.innerHTML = `
-                <div class="hs-target-input-wrap">
-                    <input type="number" id="hs-custom-target-input" min="1" max="600" value="${HSE_AdaptiveEngine.targetMinutes || 30}">
-                    <span>min</span>
-                </div>
-                <button id="hs-smart-toggle-btn" class="hs-start-btn">
-                    ${HSE_AdaptiveEngine.isActive ? 'STOP' : 'START AUTOPILOT'}
-                </button>
-            `;
+
+            const targetWrap = document.createElement('div');
+            targetWrap.className = 'hs-target-input-wrap';
+            const targetInput = document.createElement('input');
+            targetInput.type = 'number';
+            targetInput.id = 'hs-custom-target-input';
+            targetInput.min = '1';
+            targetInput.max = '600';
+            targetInput.value = String(HSE_AdaptiveEngine.targetMinutes || 30);
+            const minLabel = document.createElement('span');
+            minLabel.textContent = 'min';
+            targetWrap.appendChild(targetInput);
+            targetWrap.appendChild(minLabel);
+
+            const smartToggleBtn = document.createElement('button');
+            smartToggleBtn.id = 'hs-smart-toggle-btn';
+            smartToggleBtn.className = 'hs-start-btn';
+            smartToggleBtn.textContent = HSE_AdaptiveEngine.isActive ? 'STOP' : 'START AUTOPILOT';
+
+            inputRow.appendChild(targetWrap);
+            inputRow.appendChild(smartToggleBtn);
 
             // Active Telemetry Card (visible when active)
             const telemetryCard = document.createElement('div');
             telemetryCard.id = 'hs-telemetry-card';
             telemetryCard.className = `hs-telemetry-card ${HSE_AdaptiveEngine.isActive ? 'is-active' : ''}`;
-            telemetryCard.innerHTML = `
-                <div class="hs-telemetry-main">
-                    <span id="hs-telemetry-speed" class="hs-telemetry-speed">${HSE_Engine.currentSpeed.toFixed(2)}x</span>
-                    <span id="hs-telemetry-reason" class="hs-telemetry-reason">${HSE_AdaptiveEngine.reason || 'Adapting'}</span>
-                </div>
-                <div class="hs-telemetry-details">
-                    <span id="hs-telemetry-remaining">Remaining: ${HSE_AdaptiveEngine.getProgress().remainingWall}</span>
-                    <span id="hs-telemetry-status" class="hs-status-tag ${HSE_AdaptiveEngine.status}">${HSE_AdaptiveEngine.status.replace('_', ' ').toUpperCase()}</span>
-                </div>
-            `;
+
+            const teleMain = document.createElement('div');
+            teleMain.className = 'hs-telemetry-main';
+            const teleSpeed = document.createElement('span');
+            teleSpeed.id = 'hs-telemetry-speed';
+            teleSpeed.className = 'hs-telemetry-speed';
+            teleSpeed.textContent = `${HSE_Engine.currentSpeed.toFixed(2)}x`;
+            const teleReason = document.createElement('span');
+            teleReason.id = 'hs-telemetry-reason';
+            teleReason.className = 'hs-telemetry-reason';
+            teleReason.textContent = HSE_AdaptiveEngine.reason || 'Adapting';
+            teleMain.appendChild(teleSpeed);
+            teleMain.appendChild(teleReason);
+
+            const teleDetails = document.createElement('div');
+            teleDetails.className = 'hs-telemetry-details';
+            const teleRemaining = document.createElement('span');
+            teleRemaining.id = 'hs-telemetry-remaining';
+            teleRemaining.textContent = `Remaining: ${HSE_AdaptiveEngine.getProgress().remainingWall}`;
+            const teleStatus = document.createElement('span');
+            teleStatus.id = 'hs-telemetry-status';
+            teleStatus.className = `hs-status-tag ${HSE_AdaptiveEngine.status}`;
+            teleStatus.textContent = HSE_AdaptiveEngine.status.replace('_', ' ').toUpperCase();
+            teleDetails.appendChild(teleRemaining);
+            teleDetails.appendChild(teleStatus);
+
+            telemetryCard.appendChild(teleMain);
+            telemetryCard.appendChild(teleDetails);
 
             smartPaceSection.appendChild(smartHeader);
             smartPaceSection.appendChild(promptText);
@@ -1221,7 +1311,7 @@
             smartPaceSection.appendChild(telemetryCard);
 
             // Wire buttons
-            smartHeader.querySelector('#hs-use-my-pace-btn').onclick = () => {
+            useMyPaceBtn.onclick = () => {
                 HSE_AdaptiveEngine.start(null, true);
                 this.resetHideTimer();
             };
@@ -1312,7 +1402,7 @@
             if (!this.panel) return;
             const container = this.panel.querySelector('#hs-speed-btn-container');
             if (!container) return;
-            container.innerHTML = '';
+            container.replaceChildren();
 
             const presets = HSE_Store.getPresets();
             presets.forEach((s) => {
@@ -1381,40 +1471,77 @@
             const modal = document.createElement('div');
             modal.id = 'hs-completion-modal';
             modal.className = 'hs-completion-modal';
-            modal.innerHTML = `
-                <div class="hs-completion-card">
-                    <div class="hs-completion-header">
-                        <span class="hs-lightning">⚡</span>
-                        <h3>Smart Pace Complete</h3>
-                        <button class="hs-completion-close">&times;</button>
-                    </div>
-                    <div class="hs-completion-stats">
-                        <div class="hs-stat-item"><span>Original:</span> <strong>${data.originalDuration}</strong></div>
-                        <div class="hs-stat-item"><span>You Watched:</span> <strong>${data.actualViewingTime}</strong></div>
-                        <div class="hs-stat-item highlight"><span>Time Saved:</span> <strong>${data.timeSaved}</strong></div>
-                        <div class="hs-stat-item"><span>Average Pace:</span> <strong>${data.averagePace}</strong></div>
-                    </div>
-                    <button id="hs-copy-result-btn" class="hs-copy-btn">Copy Result</button>
-                    <div id="hs-copy-status" class="hs-copy-status"></div>
-                </div>
-            `;
 
-            modal.querySelector('.hs-completion-close').onclick = () => modal.remove();
-            const copyBtn = modal.querySelector('#hs-copy-result-btn');
-            const statusDiv = modal.querySelector('#hs-copy-status');
+            const card = document.createElement('div');
+            card.className = 'hs-completion-card';
+
+            const header = document.createElement('div');
+            header.className = 'hs-completion-header';
+
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'hs-lightning';
+            iconSpan.textContent = '\u26A1';
+
+            const titleH3 = document.createElement('h3');
+            titleH3.textContent = 'Smart Pace Complete';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'hs-completion-close';
+            closeBtn.textContent = '\u00D7';
+            closeBtn.setAttribute('aria-label', 'Close summary');
+            closeBtn.onclick = () => modal.remove();
+
+            header.appendChild(iconSpan);
+            header.appendChild(titleH3);
+            header.appendChild(closeBtn);
+
+            const statsContainer = document.createElement('div');
+            statsContainer.className = 'hs-completion-stats';
+
+            const createStatItem = (label, value, isHighlight = false) => {
+                const item = document.createElement('div');
+                item.className = `hs-stat-item${isHighlight ? ' highlight' : ''}`;
+                const lbl = document.createElement('span');
+                lbl.textContent = label;
+                const val = document.createElement('strong');
+                val.textContent = String(value);
+                item.appendChild(lbl);
+                item.appendChild(val);
+                return item;
+            };
+
+            statsContainer.appendChild(createStatItem('Original:', data.originalDuration));
+            statsContainer.appendChild(createStatItem('You Watched:', data.actualViewingTime));
+            statsContainer.appendChild(createStatItem('Time Saved:', data.timeSaved, true));
+            statsContainer.appendChild(createStatItem('Average Pace:', data.averagePace));
+
+            const copyBtn = document.createElement('button');
+            copyBtn.id = 'hs-copy-result-btn';
+            copyBtn.className = 'hs-copy-btn';
+            copyBtn.textContent = 'Copy Result';
+
+            const statusDiv = document.createElement('div');
+            statusDiv.id = 'hs-copy-status';
+            statusDiv.className = 'hs-copy-status';
 
             copyBtn.onclick = () => {
                 if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(data.shareText).then(() => {
+                    navigator.clipboard.writeText(String(data.shareText)).then(() => {
                         statusDiv.textContent = 'Copied to clipboard!';
                         setTimeout(() => modal.remove(), 2000);
                     }).catch(() => {
-                        statusDiv.textContent = data.shareText;
+                        statusDiv.textContent = String(data.shareText);
                     });
                 } else {
-                    statusDiv.textContent = data.shareText;
+                    statusDiv.textContent = String(data.shareText);
                 }
             };
+
+            card.appendChild(header);
+            card.appendChild(statsContainer);
+            card.appendChild(copyBtn);
+            card.appendChild(statusDiv);
+            modal.appendChild(card);
 
             const mount = document.fullscreenElement || document.body;
             mount.appendChild(modal);
@@ -1471,6 +1598,9 @@
             });
 
             window.addEventListener('keydown', (e) => {
+                // Zero-Trust: Ignore synthetic untrusted events dispatched by hostile page scripts
+                if (!e.isTrusted) return;
+
                 const target = e.composedPath ? e.composedPath()[0] : e.target;
                 if (this.isInputElement(target)) return;
 
@@ -1518,6 +1648,7 @@
             });
 
             window.addEventListener('keyup', (e) => {
+                if (!e.isTrusted) return;
                 const keyName = this.formatKey(e);
                 const custom = HSE_Store.customSettings;
                 if (keyName === custom.keySmartSpeed && this.isSmartSpeedActive) {
@@ -1534,6 +1665,8 @@
         if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
 
         chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+            // Zero-Trust: Strictly verify message comes from our own extension context
+            if (!sender || sender.id !== chrome.runtime.id) return;
             if (!message || typeof message !== 'object') return;
 
             if (message.action === 'toggleOverlay') {
@@ -1564,8 +1697,8 @@
             }
 
             if (message.action === 'startSmartPace') {
-                const min = message.minutes;
-                const isPersonal = !!message.usePersonalPace;
+                const min = Math.max(1, Math.min(600, Number(message.minutes) || 30));
+                const isPersonal = Boolean(message.usePersonalPace);
                 HSE_AdaptiveEngine.start(min, isPersonal);
                 sendResponse({ success: true, progress: HSE_AdaptiveEngine.getProgress() });
                 return;
@@ -1578,8 +1711,9 @@
             }
 
             if (message.action === 'setSpeed') {
-                if (typeof message.speed === 'number') {
-                    HSE_Engine.setSpeed(message.speed, true, true);
+                if (typeof message.speed === 'number' && Number.isFinite(message.speed)) {
+                    const sanitized = sanitizeSpeed(message.speed);
+                    HSE_Engine.setSpeed(sanitized, true, true);
                     sendResponse({ success: true, newSpeed: HSE_Engine.currentSpeed });
                 }
                 return;
@@ -1587,7 +1721,8 @@
 
             if (message.action === 'skip') {
                 const video = HSE_Intel.getVideo();
-                const sec = Number(message.seconds) || 10;
+                const rawSec = Number(message.seconds);
+                const sec = Number.isFinite(rawSec) ? Math.max(-600, Math.min(600, rawSec)) : 10;
                 if (video && Number.isFinite(video.currentTime)) {
                     video.currentTime = Math.max(0, video.currentTime + sec);
                     HSE_UI.flash(sec > 0 ? `+${sec}s` : `${sec}s`);

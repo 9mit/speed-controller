@@ -148,13 +148,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Save Preferences
     saveBtn.addEventListener('click', () => {
         const customSettings = {};
+        const allowedHotkeys = new Set(['keySpeedUp', 'keySpeedDown', 'keyReset', 'keySkipForward', 'keySkipBack', 'keySmartSpeed']);
         inputs.forEach(input => {
-            customSettings[input.id] = input.value;
+            if (allowedHotkeys.has(input.id)) {
+                customSettings[input.id] = String(input.value || '').slice(0, 32);
+            }
         });
-        customSettings.smartSpeedValue = parseFloat(selectSmartSpeed.value) || 2.0;
+        const smartVal = parseFloat(selectSmartSpeed.value);
+        customSettings.smartSpeedValue = (Number.isFinite(smartVal) && smartVal >= 0.1 && smartVal <= 16) ? Math.round(smartVal * 100) / 100 : 2.0;
 
         const rawPresets = inputPresets.value.split(',').map(s => parseFloat(s.trim())).filter(n => Number.isFinite(n) && n > 0 && n <= 16);
-        const validatedPresets = rawPresets.length ? rawPresets : [1, 1.25, 1.5, 1.75, 2, 2.5];
+        const validatedPresets = rawPresets.length ? rawPresets.map(n => Math.round(n * 100) / 100) : [1, 1.25, 1.5, 1.75, 2, 2.5];
 
         chrome.storage.local.get(['hse_settings'], (result) => {
             const hse_settings = result.hse_settings || {};

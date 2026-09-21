@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OTT SPEED PLAYBACK",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Smart playback autopilot with content-aware adaptive pace, finish-time targeting, and custom speed controls on streaming services.",
   "permissions": [
     "activeTab",

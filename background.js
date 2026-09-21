@@ -1,6 +1,7 @@
 /**
- * OTT SPEED PLAYBACK - Background Service Worker (v2.3.0)
+ * OTT SPEED PLAYBACK - Background Service Worker (v4.1.0)
  * Manages tab commands, options navigation, and cross-context coordination.
+ * Hardened with Zero-Trust message validation and strict sender verification.
  */
 
 const STREAM_DOMAINS = new Set([
@@ -35,7 +36,7 @@ const AMAZON_DOMAINS = new Set([
 ]);
 
 function getRegistrableDomain(hostname) {
-    if (!hostname) return '';
+    if (!hostname || typeof hostname !== 'string') return '';
     const parts = hostname.toLowerCase().split('.').filter(Boolean);
     if (parts.length < 2) return hostname.toLowerCase();
 
@@ -68,14 +69,15 @@ function isSupportedUrl(rawUrl) {
 }
 
 function isSupportedTab(tab) {
-    return !!(tab && tab.id && tab.url && isSupportedUrl(tab.url));
+    return !!(tab && typeof tab.id === 'number' && tab.url && isSupportedUrl(tab.url));
 }
 
 async function ensureContentScripts(tabId) {
+    if (typeof tabId !== 'number') return false;
     try {
         const [result] = await chrome.scripting.executeScript({
             target: { tabId },
-            func: () => !!document.documentElement.dataset.hsSpeedBootedV2
+            func: () => !!(document.documentElement.dataset.hsSpeedBootedV4 || document.documentElement.dataset.hsSpeedBootedV2)
         });
 
         if (!result || !result.result) {
@@ -96,21 +98,16 @@ async function ensureContentScripts(tabId) {
 }
 
 async function toggleOverlay(tabId) {
-    if (!tabId) return;
-    const ready = await ensureContentScripts(tabId);
-    if (!ready) return;
-
+    if (typeof tabId !== 'number') return;
     try {
+        const tab = await chrome.tabs.get(tabId);
+        if (!isSupportedTab(tab)) return;
+
+        const ready = await ensureContentScripts(tabId);
+        if (!ready) return;
+
         await chrome.tabs.sendMessage(tabId, { action: 'toggleOverlay' });
-    } catch (_) {
-        // Fallback to DOM custom event dispatch
-        try {
-            await chrome.scripting.executeScript({
-                target: { tabId },
-                func: () => window.dispatchEvent(new CustomEvent('hs-speed-toggle-v2'))
-            });
-        } catch (_) {}
-    }
+    } catch (_) {}
 }
 
 // Global keyboard command listener (Alt+Shift+S)
@@ -125,39 +122,15 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
 });
 
-// Runtime message passing
+// Runtime message passing with strict sender verification
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    // Zero-Trust: Reject any message from external extensions or untrusted senders
+    if (!sender || sender.id !== chrome.runtime.id) return;
     if (!message || typeof message !== 'object') return;
 
     if (message.action === 'openOptionsPage') {
         chrome.runtime.openOptionsPage();
         sendResponse({ success: true });
         return;
-    }
-
-    if (message.action === 'checkActiveTab') {
-        chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
-            if (!tab || !tab.id) {
-                sendResponse({ supported: false });
-                return;
-            }
-            const supported = isSupportedTab(tab);
-            sendResponse({
-                supported,
-                tabId: tab.id,
-                url: supported ? tab.url : undefined
-            });
-        }).catch(() => {
-            sendResponse({ supported: false });
-        });
-        return true; // Keep channel open for async response
-    }
-
-    if (message.action === 'toggleOverlayOnTab') {
-        const tabId = message.tabId;
-        if (tabId) {
-            toggleOverlay(tabId).then(() => sendResponse({ success: true }));
-            return true;
-        }
     }
 });
