@@ -80,6 +80,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    function updateCurrentSpeedDisplay(speed) {
+        currentSpeed = speed;
+        const badge = document.getElementById('popupCurrentSpeedBadge');
+        if (badge) {
+            badge.textContent = `${speed.toFixed(2)}x`;
+            badge.classList.toggle('is-boosted', Math.abs(speed - 1.0) > 0.01);
+        }
+        if (resetSpeedBtn) {
+            resetSpeedBtn.textContent = (Math.abs(speed - 1.0) < 0.01) ? '1.0x (Normal)' : 'Reset (1.0x)';
+        }
+        renderPresetsActive();
+    }
+
     async function sendSpeed(newSpeed) {
         if (!currentTabId) return;
         try {
@@ -88,8 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 speed: newSpeed
             });
             if (resp && resp.success) {
-                currentSpeed = resp.newSpeed;
-                renderPresetsActive();
+                updateCurrentSpeedDisplay(resp.newSpeed);
             }
         } catch (_) {}
     }
@@ -145,7 +157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             platformBadge.textContent = response.platformLabel || 'Streaming';
             streamTitle.textContent = response.title || 'Current Video';
             speedStep = response.speedStep || 0.1;
-            currentSpeed = response.currentSpeed || 1.0;
+            updateCurrentSpeedDisplay(response.currentSpeed || 1.0);
 
             if (response.personalPace) {
                 popupUseMyPaceBtn.textContent = `Use my pace (${response.personalPace.toFixed(2)}x)`;
@@ -156,6 +168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const presets = response.presets || [1, 1.25, 1.5, 1.75, 2, 2.5];
             renderPresets(presets);
+            renderPresetsActive();
 
             if (response.smartPace) {
                 updateAutopilotUI(response.smartPace);

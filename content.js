@@ -1014,6 +1014,10 @@
                 document.documentElement.dataset.hsePlaybackRate = String(clamped);
             }
 
+            try {
+                window.dispatchEvent(new CustomEvent('hs-speed-change', { detail: { speed: clamped } }));
+            } catch (_) {}
+
             const allVideos = collectVideos(document, []);
             for (const video of allVideos) {
                 if (video && video.isConnected) {
@@ -1043,6 +1047,7 @@
                     HSE_UI.flash(`${clamped}x`);
                 }
                 HSE_UI.update();
+                HSE_UI.updateBadge();
             }
         },
 
@@ -1054,6 +1059,7 @@
             const saved = HSE_Store.getSpeedForShow(info.id);
             this.setSpeed(saved, false);
             HSE_UI.update();
+            HSE_UI.updateBadge();
         },
 
         enforce() {
@@ -1072,6 +1078,7 @@
                     } catch (_) {}
                 }
             }
+            HSE_UI.updateBadge();
             HSE_UI.updateStatus();
         }
     };
@@ -1087,6 +1094,7 @@
 
         init() {
             this.createIndicator();
+            this.updateBadge();
             window.addEventListener(TOGGLE_EVENT, () => this.toggle());
 
             document.addEventListener('fullscreenchange', () => {
@@ -1094,26 +1102,65 @@
                 const ind = document.getElementById('hse-flash-indicator');
                 if (ind && ind.parentElement !== fsTarget) fsTarget.appendChild(ind);
                 if (this.panel && this.panel.parentElement !== fsTarget) fsTarget.appendChild(this.panel);
+                const badge = document.getElementById('hse-player-badge');
+                if (badge && badge.parentElement !== fsTarget) fsTarget.appendChild(badge);
             });
+        },
+
+        getMountElement() {
+            return document.fullscreenElement ||
+                   document.querySelector('.player-container, [data-testid="player-container"], .video-container, .shaka-video-container') ||
+                   document.body;
         },
 
         createIndicator() {
             let ind = document.getElementById('hse-flash-indicator');
+            const mount = this.getMountElement();
             if (!ind) {
                 ind = document.createElement('div');
                 ind.id = 'hse-flash-indicator';
-                (document.fullscreenElement || document.body).appendChild(ind);
+                mount.appendChild(ind);
+            } else if (ind.parentElement !== mount) {
+                mount.appendChild(ind);
             }
+            return ind;
+        },
+
+        createBadge() {
+            let badge = document.getElementById('hse-player-badge');
+            const video = HSE_Intel.getVideo();
+            const parent = video ? (video.parentElement || document.body) : document.body;
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.id = 'hse-player-badge';
+                badge.title = 'Current OTT Playback Speed (Click to open controls)';
+                badge.onclick = (e) => {
+                    e.stopPropagation();
+                    this.toggle();
+                };
+                if (parent) parent.appendChild(badge);
+            } else if (badge.parentElement !== parent && parent) {
+                parent.appendChild(badge);
+            }
+            return badge;
+        },
+
+        updateBadge() {
+            const badge = this.createBadge();
+            if (!badge) return;
+            const speed = HSE_Engine.currentSpeed;
+            badge.textContent = `⚡ ${speed.toFixed(2)}x`;
+            badge.classList.toggle('is-boosted', Math.abs(speed - 1.0) > 0.01);
         },
 
         flash(text, isLong = false) {
-            this.createIndicator();
-            const ind = document.getElementById('hse-flash-indicator');
+            const ind = this.createIndicator();
             if (!ind) return;
             ind.textContent = text;
             ind.classList.add('is-visible');
             if (this.flashTimer) clearTimeout(this.flashTimer);
-            this.flashTimer = setTimeout(() => ind.classList.remove('is-visible'), isLong ? 2200 : 900);
+            this.flashTimer = setTimeout(() => ind.classList.remove('is-visible'), isLong ? 2200 : 1100);
+            this.updateBadge();
         },
 
         toggle() {
