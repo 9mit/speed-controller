@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTT SPEED PLAYBACK v4.0.0</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container">
+        <!-- Header -->
+        <header class="popup-header">
+            <div class="brand">
+                <img src="icon48.png" alt="Logo" width="28" height="28" class="brand-icon">
+                <div class="brand-text">
+                    <h1>OTT SPEED</h1>
+                    <span class="version-tag">v4.0</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="openOptionsBtn" class="icon-action-btn" title="Preferences" aria-label="Open Preferences">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Active Video State -->
+        <main id="activeView" class="view-panel" style="display: none;">
+            <div class="stream-info-card">
+                <div class="stream-platform-row">
+                    <span id="platformBadge" class="platform-pill">Platform</span>
+                    <span id="playingStateBadge" class="status-pill active-pill">Active</span>
+                </div>
+                <div id="streamTitle" class="stream-title" title="Current Video">Current Video</div>
+            </div>
+
+            <!-- HERO: Smart Pace Autopilot Card -->
+            <div class="smart-pace-hero-card">
+                <div class="smart-pace-hero-header">
+                    <div class="smart-title">
+                        <span class="lightning">⚡</span>
+                        <span>SMART PACE AUTOPILOT</span>
+                    </div>
+                    <button id="popupUseMyPaceBtn" class="pill-btn">Use my pace</button>
+                </div>
+                <p class="finish-prompt">Finish this video in...</p>
+                <div class="target-chips-row">
+                    <button class="target-chip" data-min="20">20m</button>
+                    <button class="target-chip" data-min="30">30m</button>
+                    <button class="target-chip" data-min="45">45m</button>
+                    <button class="target-chip" data-min="60">60m</button>
+                </div>
+                <div class="target-input-row">
+                    <div class="custom-target-box">
+                        <input type="number" id="popupTargetInput" min="1" max="600" value="30">
+                        <span>min</span>
+                    </div>
+                    <button id="popupToggleAutopilotBtn" class="autopilot-btn">START AUTOPILOT</button>
+                </div>
+
+                <!-- Live Autopilot Telemetry HUD -->
+                <div id="popupTelemetryHUD" class="telemetry-hud" style="display: none;">
+                    <div class="telemetry-top">
+                        <span id="popupHudSpeed" class="hud-speed">1.72x</span>
+                        <span id="popupHudReason" class="hud-reason">Dense dialogue</span>
+                    </div>
+                    <div class="telemetry-bottom">
+                        <span id="popupHudRemaining" class="hud-remaining">18m 42s left (Req: 1.84x)</span>
+                        <span id="popupHudStatus" class="hud-status on_track">ON TRACK</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Manual Controls -->
+            <div class="manual-controls-card">
+                <div class="card-caption">Manual Speed Override</div>
+                <div class="stepper-row">
+                    <button id="stepDownBtn" class="stepper-btn" title="Decrease Speed">-0.1x</button>
+                    <button id="resetSpeedBtn" class="stepper-btn reset-btn" title="Reset to Normal">1.0x Reset</button>
+                    <button id="stepUpBtn" class="stepper-btn" title="Increase Speed">+0.1x</button>
+                </div>
+                <div id="presetsGrid" class="presets-grid"></div>
+            </div>
+
+            <!-- Media Actions -->
+            <div class="quick-media-row">
+                <button id="skipBackBtn" class="secondary-action-btn" title="Rewind 10s">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg>
+                    -10s
+                </button>
+                <button id="toggleOverlayBtn" class="primary-action-btn" title="Toggle overlay in video player">
+                    <span>Toggle HUD Overlay</span>
+                    <span class="kbd-hint">Alt+Shift+S</span>
+                </button>
+                <button id="skipForwardBtn" class="secondary-action-btn" title="Skip 10s">
+                    +10s
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
+                </button>
+            </div>
+        </main>
+
+        <!-- Inactive View -->
+        <main id="inactiveView" class="view-panel">
+            <div class="empty-state-card">
+                <div class="empty-icon-wrap">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1f80e0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                </div>
+                <h2>Ready for Streaming</h2>
+                <p>Open any supported video to enable Smart Pace autopilot and finish on time.</p>
+            </div>
+
+            <div class="supported-services-section">
+                <div class="section-title">Supported Services</div>
+                <div class="services-badges">
+                    <span class="service-tag">Hotstar</span>
+                    <span class="service-tag">Netflix</span>
+                    <span class="service-tag">Prime Video</span>
+                    <span class="service-tag">ZEE5</span>
+                    <span class="service-tag">JioCinema</span>
+                    <span class="service-tag">SonyLIV</span>
+                    <span class="service-tag">Airtel Xstream</span>
+                    <span class="service-tag">Aha</span>
+                    <span class="service-tag">Hoichoi</span>
+                    <span class="service-tag">Sun NXT</span>
+                    <span class="service-tag">MX Player</span>
+                </div>
+            </div>
+
+            <div class="shortcuts-card">
+                <div class="section-title">Keyboard Shortcuts</div>
+                <div class="shortcut-list">
+                    <div class="shortcut-item"><span>Speed Adjust</span> <kbd>[</kbd> / <kbd>]</kbd></div>
+                    <div class="shortcut-item"><span>Reset 1.0x</span> <kbd>r</kbd></div>
+                    <div class="shortcut-item"><span>Smart Speed</span> <kbd>Shift</kbd> (Hold)</div>
+                    <div class="shortcut-item"><span>Toggle HUD</span> <kbd>Alt+Shift+S</kbd></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="popup-footer">
+            <span class="footer-note">Content-Aware Adaptive Pace Engine Active</span>
+        </footer>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>
