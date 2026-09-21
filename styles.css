@@ -1,4 +1,4 @@
-/* OTT SPEED PLAYBACK (v2.1) Stylesheet */
+/* OTT SPEED PLAYBACK (v3.0) Stylesheet */
 
 :root {
     --hse-accent: #1f80e0;
@@ -190,3 +190,39 @@
 }
 
 
+
+/* Smart Pace MVP */
+.hse-goal-card {
+    margin: 0 0 14px !important;
+    padding: 12px !important;
+    border: 1px solid rgba(31, 128, 224, 0.3) !important;
+    border-radius: 10px !important;
+    background: rgba(31, 128, 224, 0.08) !important;
+}
+.hse-goal-title { color: var(--hse-text) !important; font-size: 13px !important; font-weight: 800 !important; margin-bottom: 4px !important; }
+.hse-goal-hint { color: var(--hse-text-dim) !important; font-size: 10px !important; line-height: 1.45 !important; margin-bottom: 9px !important; }
+.hse-goal-quick-row { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 6px !important; margin-bottom: 8px !important; }
+.hse-goal-quick-btn, .hse-start-btn, .hse-stop-btn {
+    appearance: none !important; border-radius: 7px !important; border: 1px solid var(--hse-glass-border) !important;
+    color: var(--hse-text) !important; font-size: 11px !important; font-weight: 700 !important; cursor: pointer !important; padding: 7px 6px !important;
+}
+.hse-goal-quick-btn { background: rgba(255, 255, 255, 0.06) !important; }
+.hse-goal-quick-btn:hover { background: rgba(255, 255, 255, 0.13) !important; }
+.hse-goal-controls { display: flex !important; align-items: center !important; gap: 6px !important; }
+#hse-finish-minutes {
+    width: 64px !important; box-sizing: border-box !important; padding: 7px 8px !important; border: 1px solid var(--hse-glass-border) !important;
+    border-radius: 7px !important; background: rgba(0, 0, 0, 0.2) !important; color: var(--hse-text) !important; font-size: 12px !important; outline: none !important;
+}
+#hse-finish-minutes:focus { border-color: var(--hse-accent) !important; }
+.hse-minutes-label { color: var(--hse-text-dim) !important; font-size: 11px !important; margin-right: auto !important; }
+.hse-start-btn { background: var(--hse-accent) !important; border-color: transparent !important; min-width: 52px !important; }
+.hse-stop-btn { background: rgba(255, 255, 255, 0.06) !important; min-width: 48px !important; }
+.hse-start-btn:disabled, .hse-stop-btn:disabled { opacity: 0.4 !important; cursor: not-allowed !important; }
+.hse-section-label {
+    color: var(--hse-text-dim) !important; font-size: 10px !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.6px !important; margin-bottom: 7px !important;
+}
+#hse-personal-hint { color: var(--hse-text-dim) !important; font-size: 10px !important; margin-top: 10px !important; }
+#hs-speed-panel.hse-smart-active {
+    border-color: rgba(11, 179, 111, 0.55) !important;
+    box-shadow: 0 10px 36px rgba(11, 179, 111, 0.14), 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+}
