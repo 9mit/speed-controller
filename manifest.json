@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "OTT SPEED PLAYBACK",
-  "version": "4.1.0",
-  "description": "Smart playback autopilot with content-aware adaptive pace, finish-time targeting, and custom speed controls on streaming services.",
+  "version": "2.4.0",
+  "description": "Adjust playback speed with custom rate controls, Smart Pace finish-time targeting, keyboard shortcuts, and saved speed preferences on popular streaming services.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -138,20 +138,10 @@
   },
   "action": {
     "default_title": "OTT SPEED PLAYBACK",
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icon16.png",
       "48": "icon48.png",
       "128": "icon128.png"
-    }
-  },
-  "commands": {
-    "toggle-overlay": {
-      "suggested_key": {
-        "default": "Alt+Shift+S",
-        "mac": "Alt+Shift+S"
-      },
-      "description": "Toggle speed overlay panel on active stream"
     }
   },
   "icons": {
@@ -162,11 +152,5 @@
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
-  },
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "ott-speed-playback@naumit.dev",
-      "strict_min_version": "109.0"
-    }
   }
 }

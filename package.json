@@ -1,15 +1,14 @@
 {
   "name": "ott-speed-playback",
-  "version": "4.1.0",
-  "description": "Smart playback autopilot with content-aware adaptive pace, finish-time targeting, and custom speed controls on streaming services.",
+  "version": "2.4.0",
+  "description": "Adjust playback speed with custom rate controls, Smart Pace finish-time targeting, keyboard shortcuts, and saved speed preferences on popular streaming services.",
   "private": true,
   "scripts": {
-    "test": "node --check content.js background.js options.js popup.js main_world.js"
+    "test": "node --check content.js background.js options.js main_world.js"
   },
   "keywords": [
     "smart-pace",
-    "playback-autopilot",
-    "adaptive-speed",
+    "speed-controller",
     "hotstar",
     "jiohotstar",
     "netflix",
@@ -26,9 +25,7 @@
     "xstreamplay",
     "speed",
     "playback",
-    "chrome-extension",
-    "firefox-addon",
-    "edge-extension"
+    "chrome-extension"
   ],
   "author": "Naumit Agarwal",
   "license": "MIT"

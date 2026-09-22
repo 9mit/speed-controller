@@ -1,55 +1,26 @@
-# OTT SPEED PLAYBACK (v4.1.0)
-### The playback autopilot that automatically decides how fast each part of a video should play.
+# OTT SPEED PLAYBACK (v2.4.0)
+### High-performance playback speed controller with Smart Pace finish-time targeting for popular streaming services.
 
 <img src="icon128.png" width="128" height="128" alt="OTT SPEED PLAYBACK Logo">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-4.1.0-green.svg)](manifest.json)
+[![Version](https://img.shields.io/badge/Version-2.4.0-green.svg)](manifest.json)
 [![Platform](https://img.shields.io/badge/Platform-Chrome%20|%20Edge%20|%20Firefox-lightgrey.svg)](manifest.json)
 
 ---
 
-## The Paradigm Shift
+## Overview
 
-> **Traditional speed controller:** You choose the speed.  
-> **OTT SPEED PLAYBACK v4:** You choose how much time you have. The extension chooses the speed.
+**OTT SPEED PLAYBACK** gives you complete, robust control over your video playback speed across major streaming and OTT platforms. Built upon the battle-tested, lightweight v2.3 architecture, version 2.4.0 adds **Smart Pace Finish-Time Mode**—allowing you to choose how much time you have, and automatically calculating the optimal playback rate to finish right on schedule.
 
-Instead of keeping playback pinned to a single speed throughout an entire video, OTT SPEED PLAYBACK acts as an intelligent **playback autopilot**. Choose your target finish time (e.g. *"Finish this video in 30 minutes"*), and the content-aware adaptive engine dynamically and smoothly adjusts speed based on real-time content complexity:
-
-- **Dense, rapid dialogue** → Gently slows down (e.g. `1.35x` – `1.50x`) so you never miss key plot points.
-- **Normal conversation** → Plays at comfortable brisk pace (e.g. `1.55x` – `1.75x`).
-- **Simple dialogue & pauses** → Accelerates smoothly (e.g. `1.85x` – `2.20x`).
-- **Long silences & landscape pans** → Powers through (e.g. `2.50x` – `4.00x`).
-- **Intros & Theme sequences** → Safely skips through (e.g. `2.50x` – `3.00x`).
-- **Ending credits** → Fast-tracks to completion (up to `6.00x`).
-
-All adjustments are calculated **100% locally in your browser** using lightweight heuristic signals—**no remote AI, no external APIs, and zero privacy compromise**.
-
----
-
-## Key Features
-
-### ⚡ Smart Pace Autopilot
-- **Finish-Time Targeting**: Choose quick targets (`20m`, `30m`, `45m`, `60m`) or enter custom minutes.
-- **Content-Aware Adaptive Variations**: Dynamically balances dialogue density, pause durations, and remaining wall time to guarantee you finish on schedule.
-- **Live Telemetry HUD**: Displays real-time adaptive speed, active content classification (e.g. *Dense dialogue*, *Long pause*, *Catching up*), remaining wall time, and status (*ON TRACK*, *AHEAD*, *CATCHING UP*, *IMPOSSIBLE*).
-- **Human-Friendly Transitions**: Employs hysteresis and transition smoothing (`MIN_SPEED_CHANGE = 0.05`, 2s cooldown) to eliminate jarring speed oscillations.
-
-### 🧠 Personal Pace Learning 2.0
-- **Learns How You Watch**: Remembers your manual speed choices and overrides per platform.
-- **"Use My Normal Pace"**: One-click action calculates your personalized target finish time automatically.
-
-### ⏱️ Time Saved Moment & Local Sharing
-- **Viewing Completion Summary**: Celebrates completed videos showing original duration, actual viewing time, total time saved, and average pace.
-- **One-Click Local Copy**: Copies a friendly summary to your clipboard (*e.g., "I watched a 52-minute video in 31 minutes using OTT SPEED PLAYBACK. Saved 21 minutes."*).
-
-### 🛡️ Quality & Resolution Preservation (`main_world.js`)
-- Neutralizes Adaptive Bitrate (ABR) resolution downgrades and dropped-frame penalties in Hls.js, Shaka Player, and Dash.js engines during accelerated playback.
-
-### 🎮 Complete Manual & Overlay Controls
-- Draggable on-screen HUD with quick presets (`1x`, `1.25x`, `1.5x`, `1.75x`, `2x`, `2.5x`), fine steppers (`-0.1x`, `+0.1x`, `1.0x Reset`), and fullscreen container reparenting.
-- Browser action popup with matching autopilot controls and shortcuts cheatsheet.
-- Global keyboard command: `Alt+Shift+S` to toggle on-screen HUD at any moment.
+### What Makes v2.4.0 Special:
+- **Zero Quality Drops (`main_world.js`)**: Neutralizes aggressive Adaptive Bitrate (ABR) downshifting in Shaka Player and Hls.js during high-speed playback, keeping video crystal clear in 1080p/4K.
+- **Smart Pace Finish-Time Mode**: Select quick target finish times (`20m`, `30m`, `45m`, `60m`) or enter a custom duration in minutes. The controller calculates exact playback speed based on remaining video duration versus remaining wall time.
+- **Pause-Aware & Seek-Aware**: Wall time automatically freezes while video is paused, and required speed instantly recalculates if you seek forward or backward.
+- **Smooth Speed Adjustments**: Uses hysteresis thresholding (`0.05x`) and adjustment cooldowns to eliminate jitter and distracting micro-changes.
+- **Persistent Speed Memory**: Remembers your preferred playback speed per show / title across page reloads.
+- **One-Click Action Toggle**: Clicking the extension icon in your browser toolbar instantly toggles the in-page speed overlay.
+- **100% Private & Local**: Zero remote AI, no analytics, no external tracking, no telemetry, and local-only storage.
 
 ---
 
@@ -73,61 +44,55 @@ All adjustments are calculated **100% locally in your browser** using lightweigh
 
 | Action | Shortcut | Description |
 | :--- | :--- | :--- |
-| **Speed Down** | `[` | Decrease speed by step increment |
-| **Speed Up** | `]` | Increase speed by step increment |
+| **Speed Down** | `[` | Decrease speed by 0.1x |
+| **Speed Up** | `]` | Increase speed by 0.1x |
 | **Reset Normal** | `r` | Return immediately to 1.0x normal speed |
-| **Smart Speed** | `Shift` *(Hold)* | Momentary fast-forward (default: 2.0x) |
+| **Smart Speed** | `Shift` *(Hold)* | Temporary fast-forward boost (default: 2.0x) |
 | **Rewind** | `ArrowLeft` | Jump back 10 seconds |
 | **Skip Forward** | `ArrowRight` | Jump forward 10 seconds |
-| **Toggle HUD** | `Alt+Shift+S` | Toggle in-player Smart Pace HUD |
 
-*Shortcuts can be customized in the extension Preferences page.*
+*All keyboard shortcuts and step sizes can be customized in the Extension Options page.*
 
 ---
 
 ## Privacy & Security Guarantees
 
-- **Zero Remote AI or Speech APIs**: Content analysis runs exclusively in-browser via DOM heuristics and media timing.
-- **Zero Network Egress**: The extension never transmits data, analytics, or telemetry to external servers.
-- **Local Storage Only**: Preferences and pace profiles reside strictly in `chrome.storage.local`.
-- **Least Privilege**: Manifest permissions are limited to `activeTab`, `scripting`, `storage`, and specific video origins.
+- **Zero External APIs or Analytics**: Operates 100% locally in your browser.
+- **Zero Network Telemetry**: Never makes outbound network requests.
+- **Local Storage Only**: All speed preferences reside solely in your browser's `chrome.storage.local`.
+- **Strict Least Privilege**: Manifest permissions are strictly limited to `activeTab`, `scripting`, `storage`, and designated streaming host patterns.
 
 ---
 
 ## Technical Architecture
 
 ```text
-content.js
- ├── Platform detection        (13 streaming platforms + regional Prime domains)
- ├── HSE_Intel                 (Shadow-DOM video discovery & player reconnection)
- ├── HSE_Analyzer              (Content difficulty, speech density & silence detection)
- ├── HSE_AdaptiveEngine        (Finish-time budget calculator & pacing state machine)
- ├── HSE_Store                 (Local storage hydration & Personal Pace Learning 2.0)
- ├── HSE_UI                    (Hero Smart Pace HUD, completion modal & indicators)
- └── HSE_Input                 (Keyboard isolation & modifier collision prevention)
+OTT SPEED PLAYBACK v2.4.0
+ ├── main_world.js             (ABR bitrate neutralizer, Shaka/Hls protection)
+ ├── background.js             (Service worker, toolbar action click toggle, options router)
+ ├── content.js
+ │    ├── 11 Platform Adapters (Hotstar, Netflix, Prime, Zee5, JioCinema, SonyLIV, etc.)
+ │    ├── HSE_Intel            (Deep DOM & Shadow-DOM video element discovery)
+ │    ├── HSE_Engine           (Playback speed enforcement & synchronization)
+ │    ├── HSE_SmartPace        (Finish-time calculation, pause compensation & hysteresis)
+ │    ├── HSE_Store            (Local storage hydration, per-show memory & pace profile)
+ │    ├── HSE_UI               (Floating glassmorphism speed panel & video badge)
+ │    └── HSE_Input            (Keyboard shortcut listener & typing guard)
+ └── styles.css                (Lightweight glassmorphic UI stylesheet)
 ```
 
 ---
 
-## Installation
+## Installation & Development
 
-### Chrome & Edge
-1. Clone or download this repository.
-2. Open `chrome://extensions/` (or `edge://extensions/`).
-3. Enable **Developer mode**.
-4. Click **Load unpacked** and select this directory.
+### Chrome & Edge (Load Unpacked)
+1. Open `chrome://extensions/` or `edge://extensions/`.
+2. Enable **Developer mode** in the top right.
+3. Click **Load unpacked** and select the root directory of this extension.
 
-### Firefox
-1. Open `about:debugging#/runtime/this-firefox`.
-2. Click **Load Temporary Add-on...**.
-3. Select `manifest.json`.
-
----
-
-## Running Automated Tests
-
+### Run Static & Syntax Verification
 ```bash
-npm test
+node --check content.js background.js options.js main_world.js
 ```
 
 ---
