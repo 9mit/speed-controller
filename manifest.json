@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OTT SPEED PLAYBACK",
-  "version": "2.4.0",
+  "version": "4.5",
   "description": "Adjust playback speed with custom rate controls, Smart Pace finish-time targeting, keyboard shortcuts, and saved speed preferences on popular streaming services and YouTube.",
   "permissions": [
     "activeTab",

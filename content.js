@@ -1,8 +1,8 @@
 /**
- * OTT SPEED PLAYBACK (v2.4.0)
- * Playback rate control for Hotstar, JioHotstar, Netflix, Prime Video,
+ * OTT SPEED PLAYBACK (v4.5)
+ * Playback rate control for YouTube, YouTube Shorts, Hotstar, JioHotstar, Netflix, Prime Video,
  * ZEE5, Airtel Xstream, JioCinema, SonyLIV, Aha, Hoichoi, Sun NXT, and MX Player.
- * Built strictly additively on the canonical v2.3 architecture with Smart Pace finish-time mode.
+ * Built with Smart Pace finish-time mode and adaptive speed targeting.
  */
 (function () {
     'use strict';
