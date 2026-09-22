@@ -177,47 +177,6 @@
     opacity: 1 !important;
 }
 
-/* Persistent Corner Speed Badge On Video */
-#hse-player-badge {
-    position: absolute !important;
-    top: 24px !important;
-    right: 24px !important;
-    z-index: 2147483646 !important;
-    background: rgba(9, 24, 48, 0.85) !important;
-    backdrop-filter: blur(14px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(14px) saturate(180%) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 20px !important;
-    padding: 6px 14px !important;
-    color: #ffffff !important;
-    font-size: 13px !important;
-    font-weight: 800 !important;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    letter-spacing: 0.5px !important;
-    cursor: pointer !important;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
-    opacity: 0.85 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    user-select: none !important;
-}
-
-#hse-player-badge:hover {
-    opacity: 1 !important;
-    transform: scale(1.06) !important;
-    border-color: var(--hse-accent) !important;
-    box-shadow: 0 6px 20px rgba(31, 128, 224, 0.35) !important;
-}
-
-#hse-player-badge.is-boosted {
-    opacity: 1 !important;
-    background: rgba(9, 24, 48, 0.92) !important;
-    border-color: rgba(11, 179, 111, 0.6) !important;
-    color: #4ef0a2 !important;
-    box-shadow: 0 4px 16px rgba(11, 179, 111, 0.3) !important;
-}
 
 /* Smart Pace / Finish-Time Mode (v2.4 Addition) */
 .hs-smart-pace-section {

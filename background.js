@@ -11,7 +11,9 @@ const STREAM_DOMAINS = new Set([
     'aha.video',
     'hoichoi.tv',
     'sunnxt.com',
-    'mxplayer.in'
+    'mxplayer.in',
+    'youtube.com',
+    'youtu.be'
 ]);
 
 const AMAZON_DOMAINS = new Set([

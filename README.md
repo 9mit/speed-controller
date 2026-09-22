@@ -24,19 +24,20 @@
 
 ---
 
-## Supported Streaming Services
+## Supported Streaming Services & Platforms
 
-1. **Disney+ Hotstar / JioHotstar** (`hotstar.com`, `jiohotstar.com`)
-2. **Netflix** (`netflix.com`)
-3. **Amazon Prime Video** (`primevideo.com`, regional `amazon.*/gp/video/*`)
-4. **ZEE5** (`zee5.com`)
-5. **JioCinema** (`jiocinema.com`)
-6. **SonyLIV** (`sonyliv.com`)
-7. **Airtel Xstream / Xstream Play** (`airtelxstream.in`, `xstreamplay.in`)
-8. **Aha** (`aha.video`)
-9. **Hoichoi** (`hoichoi.tv`)
-10. **Sun NXT** (`sunnxt.com`)
-11. **MX Player** (`mxplayer.in`)
+1. **YouTube & YouTube Shorts** (`youtube.com`, `youtu.be`, `/watch?v=...`, `/shorts/...`)
+2. **Disney+ Hotstar / JioHotstar** (`hotstar.com`, `jiohotstar.com`)
+3. **Netflix** (`netflix.com`)
+4. **Amazon Prime Video** (`primevideo.com`, regional `amazon.*/gp/video/*`)
+5. **ZEE5** (`zee5.com`)
+6. **JioCinema** (`jiocinema.com`)
+7. **SonyLIV** (`sonyliv.com`)
+8. **Airtel Xstream / Xstream Play** (`airtelxstream.in`, `xstreamplay.in`)
+9. **Aha** (`aha.video`)
+10. **Hoichoi** (`hoichoi.tv`)
+11. **Sun NXT** (`sunnxt.com`)
+12. **MX Player** (`mxplayer.in`)
 
 ---
 
@@ -71,12 +72,12 @@ OTT SPEED PLAYBACK v2.4.0
  ├── main_world.js             (ABR bitrate neutralizer, Shaka/Hls protection)
  ├── background.js             (Service worker, toolbar action click toggle, options router)
  ├── content.js
- │    ├── 11 Platform Adapters (Hotstar, Netflix, Prime, Zee5, JioCinema, SonyLIV, etc.)
- │    ├── HSE_Intel            (Deep DOM & Shadow-DOM video element discovery)
+ │    ├── 12 Platform Adapters (YouTube & Shorts, Hotstar, Netflix, Prime, Zee5, etc.)
+ │    ├── HSE_Intel            (Viewport-aware & Shadow-DOM video element discovery)
  │    ├── HSE_Engine           (Playback speed enforcement & synchronization)
  │    ├── HSE_SmartPace        (Finish-time calculation, pause compensation & hysteresis)
  │    ├── HSE_Store            (Local storage hydration, per-show memory & pace profile)
- │    ├── HSE_UI               (Floating glassmorphism speed panel & video badge)
+ │    ├── HSE_UI               (Floating glassmorphism speed panel & flash overlay)
  │    └── HSE_Input            (Keyboard shortcut listener & typing guard)
  └── styles.css                (Lightweight glassmorphic UI stylesheet)
 ```

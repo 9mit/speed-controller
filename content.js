@@ -31,11 +31,37 @@
         return results;
     }
 
+    function isVideoInViewport(v) {
+        try {
+            const rect = v.getBoundingClientRect();
+            const vh = window.innerHeight || document.documentElement.clientHeight;
+            const vw = window.innerWidth || document.documentElement.clientWidth;
+            return rect.width > 0 && rect.height > 0 &&
+                   rect.top < vh && rect.bottom > 0 &&
+                   rect.left < vw && rect.right > 0;
+        } catch (_) {
+            return false;
+        }
+    }
+
     function pickLargestVideo(videos) {
-        const connected = videos.filter((v) => v.isConnected && v.readyState >= 1);
-        const pool = connected.length ? connected : videos.filter((v) => v.isConnected);
-        if (!pool.length) return videos[0] || null;
-        return pool.sort((a, b) => (b.clientWidth * b.clientHeight) - (a.clientWidth * a.clientHeight))[0];
+        const connected = videos.filter((v) => v.isConnected);
+        if (!connected.length) return videos[0] || null;
+
+        // 1. If any video is actively playing, prioritize it (essential for YouTube Shorts & carousels)
+        const playing = connected.filter((v) => !v.paused && v.readyState >= 1);
+        if (playing.length === 1) return playing[0];
+        if (playing.length > 1) {
+            return playing.sort((a, b) => (b.clientWidth * b.clientHeight) - (a.clientWidth * a.clientHeight))[0];
+        }
+
+        // 2. Filter to videos visible within the viewport (ignores offscreen preloaded shorts)
+        const inViewport = connected.filter((v) => isVideoInViewport(v));
+        const pool = inViewport.length ? inViewport : connected;
+
+        const ready = pool.filter((v) => v.readyState >= 1);
+        const candidates = ready.length ? ready : pool;
+        return candidates.sort((a, b) => (b.clientWidth * b.clientHeight) - (a.clientWidth * a.clientHeight))[0];
     }
 
     function cleanTitle(raw, suffixes) {
@@ -337,6 +363,57 @@
                     /\s*Watch\s*.*on\s*MX Player$/i
                 ]);
             }
+        },
+
+        youtube: {
+            id: 'youtube',
+            label: 'YouTube',
+            match(hostname) {
+                return /(^|\.)youtube\.com$|(^|\.)youtu\.be$/i.test(hostname);
+            },
+            getContentId(pathname) {
+                // 1. YouTube Shorts: /shorts/:id
+                const shortsMatch = pathname.match(/\/shorts\/([a-zA-Z0-9_-]{6,16})/i);
+                if (shortsMatch) {
+                    return `yt_short_${shortsMatch[1]}`;
+                }
+
+                // 2. Standard Watch URL: /watch?v=:id
+                try {
+                    const searchParams = new URLSearchParams(window.location.search);
+                    const v = searchParams.get('v');
+                    if (v && /^[a-zA-Z0-9_-]{6,16}$/.test(v)) {
+                        return `yt_${v}`;
+                    }
+                } catch (_) {}
+
+                // 3. youtu.be/:id
+                if (/(^|\.)youtu\.be$/i.test(window.location.hostname)) {
+                    const shortMatch = pathname.match(/^\/([a-zA-Z0-9_-]{6,16})/);
+                    if (shortMatch) {
+                        return `yt_${shortMatch[1]}`;
+                    }
+                }
+
+                // 4. Embed: /embed/:id
+                const embedMatch = pathname.match(/\/embed\/([a-zA-Z0-9_-]{6,16})/i);
+                if (embedMatch) {
+                    return `yt_${embedMatch[1]}`;
+                }
+
+                // 5. Live stream: /live/:id
+                const liveMatch = pathname.match(/\/live\/([a-zA-Z0-9_-]{6,16})/i);
+                if (liveMatch) {
+                    return `yt_live_${liveMatch[1]}`;
+                }
+
+                return 'generic';
+            },
+            getTitle() {
+                return cleanTitle(document.title, [
+                    /\s*-\s*YouTube\s*$/i
+                ]);
+            }
         }
     };
 
@@ -549,7 +626,6 @@
                 }
                 HSE_UI.update();
                 HSE_UI.flash(clamped + 'x');
-                HSE_UI.updateBadge();
             }
         },
 
@@ -561,7 +637,6 @@
             const saved = HSE_Store.getSpeedForShow(info.id);
             this.setSpeed(saved, false, false);
             HSE_UI.update();
-            HSE_UI.updateBadge();
         },
 
         enforce() {
@@ -579,7 +654,6 @@
                 this.setSpeed(target, false, false);
             }
             HSE_UI.updateStatus();
-            HSE_UI.updateBadge();
         }
     };
 
@@ -703,7 +777,8 @@
 
         init() {
             this.createIndicator();
-            this.updateBadge();
+            const existingBadge = document.getElementById('hse-player-badge');
+            if (existingBadge) existingBadge.remove();
             window.addEventListener(TOGGLE_EVENT, () => this.toggle());
 
             document.addEventListener('fullscreenchange', () => {
@@ -711,14 +786,12 @@
                 const ind = document.getElementById('hse-flash-indicator');
                 if (ind && ind.parentElement !== fsTarget) fsTarget.appendChild(ind);
                 if (this.panel && this.panel.parentElement !== fsTarget) fsTarget.appendChild(this.panel);
-                const badge = document.getElementById('hse-player-badge');
-                if (badge && badge.parentElement !== fsTarget) fsTarget.appendChild(badge);
             });
         },
 
         getMountElement() {
             return document.fullscreenElement ||
-                   document.querySelector('.player-container, [data-testid="player-container"], .video-container, .shaka-video-container') ||
+                   document.querySelector('#movie_player, ytd-player, .player-container, [data-testid="player-container"], .video-container, .shaka-video-container') ||
                    document.body;
         },
 
@@ -735,33 +808,6 @@
             return ind;
         },
 
-        createBadge() {
-            let badge = document.getElementById('hse-player-badge');
-            const video = HSE_Intel.getVideo();
-            const parent = video ? (video.parentElement || document.body) : document.body;
-            if (!badge) {
-                badge = document.createElement('div');
-                badge.id = 'hse-player-badge';
-                badge.title = 'Current OTT Playback Speed (Click to open controls)';
-                badge.onclick = (e) => {
-                    e.stopPropagation();
-                    this.toggle();
-                };
-                if (parent) parent.appendChild(badge);
-            } else if (badge.parentElement !== parent && parent) {
-                parent.appendChild(badge);
-            }
-            return badge;
-        },
-
-        updateBadge() {
-            const badge = this.createBadge();
-            if (!badge) return;
-            const speed = HSE_Engine.currentSpeed;
-            badge.textContent = `⚡ ${speed.toFixed(2)}x`;
-            badge.classList.toggle('is-boosted', Math.abs(speed - 1.0) > 0.01);
-        },
-
         flash(text, isLong = false) {
             const ind = this.createIndicator();
             if (!ind) return;
@@ -769,7 +815,6 @@
             ind.classList.add('is-visible');
             if (this.flashTimer) clearTimeout(this.flashTimer);
             this.flashTimer = setTimeout(() => ind.classList.remove('is-visible'), isLong ? 2000 : 800);
-            this.updateBadge();
         },
 
         toggle() {
@@ -1066,6 +1111,8 @@
         };
 
         window.addEventListener('popstate', loadInitialSpeed);
+        window.addEventListener('yt-navigate-finish', () => setTimeout(loadInitialSpeed, 150));
+        window.addEventListener('yt-page-data-updated', () => setTimeout(loadInitialSpeed, 150));
 
         const originalPush = history.pushState;
         history.pushState = function () {
