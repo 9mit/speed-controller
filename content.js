@@ -1,5 +1,5 @@
 /**
- * OTT SPEED PLAYBACK (v4.5)
+ * OTT SPEED PLAYBACK (v5.0)
  * Playback rate control for YouTube, YouTube Shorts, Hotstar, JioHotstar, Netflix, Prime Video,
  * ZEE5, Airtel Xstream, JioCinema, SonyLIV, Aha, Hoichoi, Sun NXT, and MX Player.
  * Built with Smart Pace finish-time mode and adaptive speed targeting.
@@ -9,7 +9,7 @@
 
     const ROOT_FLAG = 'hsSpeedBootedV2';
     const TOGGLE_EVENT = 'hs-speed-toggle-v2';
-    const DEFAULT_SPEEDS = [1, 1.5, 1.75, 2, 2.5];
+    const DEFAULT_SPEEDS = [1, 1.25, 1.5, 1.75, 2, 2.5];
     const REFRESH_MS = 1000;
     const MAX_SPEED = 16;
 
@@ -538,7 +538,9 @@
         },
 
         setSpeedForShow(showId, speed) {
-            this.settings.showSpeeds[this.storageKey(showId)] = sanitizeSpeed(speed);
+            const clamped = sanitizeSpeed(speed);
+            this.settings.showSpeeds[this.storageKey(showId)] = clamped;
+            this.settings.globalSpeed = clamped;
             this.save();
         },
 
@@ -629,13 +631,41 @@
             }
         },
 
+        adoptPlatformSpeed(speed) {
+            const clamped = sanitizeSpeed(speed);
+            if (Math.abs(this.currentSpeed - clamped) < 0.01) return;
+
+            this.currentSpeed = clamped;
+            document.documentElement.dataset.hsePlaybackRate = String(clamped);
+
+            const info = HSE_Intel.getContentInfo();
+            HSE_Store.setSpeedForShow(info.id, clamped);
+            HSE_Store.recordUserSpeed(clamped);
+
+            if (HSE_SmartPace.isActive) {
+                HSE_SmartPace.stop(false);
+            }
+
+            HSE_UI.update();
+            HSE_UI.flash(clamped + 'x');
+        },
+
         syncContentSpeed() {
             if (HSE_SmartPace.isActive) return;
             const info = HSE_Intel.getContentInfo();
             if (info.id === this.lastContentId) return;
             this.lastContentId = info.id;
-            const saved = HSE_Store.getSpeedForShow(info.id);
-            this.setSpeed(saved, false, false);
+
+            const key = HSE_Store.storageKey(info.id);
+            const hasSavedSpeed = HSE_Store.settings.showSpeeds[key] != null;
+            const video = HSE_Intel.getVideo();
+
+            if (!hasSavedSpeed && video && Number.isFinite(video.playbackRate) && Math.abs(video.playbackRate - 1.0) > 0.01) {
+                this.adoptPlatformSpeed(video.playbackRate);
+            } else {
+                const saved = HSE_Store.getSpeedForShow(info.id);
+                this.setSpeed(saved, false, false);
+            }
             HSE_UI.update();
         },
 
@@ -650,8 +680,10 @@
             if (!video) return;
 
             const target = this.currentSpeed;
-            if (Math.abs(video.playbackRate - target) > 0.01) {
-                this.setSpeed(target, false, false);
+            const currentRate = video.playbackRate;
+            if (Math.abs(currentRate - target) > 0.01) {
+                // If the video's rate diverged, adopt the platform speed rather than forcefully overwriting it!
+                this.adoptPlatformSpeed(currentRate);
             }
             HSE_UI.updateStatus();
         }
@@ -769,6 +801,74 @@
         }
     };
 
+    // --- HSE_UI: Helpers & Icons ---
+    function createSvgIcon(name) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('width', '14');
+        svg.setAttribute('height', '14');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+
+        if (name === 'gear') {
+            svg.innerHTML = '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>';
+        } else if (name === 'close') {
+            svg.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
+        } else if (name === 'minus') {
+            svg.innerHTML = '<line x1="5" y1="12" x2="19" y2="12"></line>';
+        } else if (name === 'plus') {
+            svg.innerHTML = '<line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line>';
+        } else if (name === 'bolt') {
+            svg.innerHTML = '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>';
+        }
+        return svg;
+    }
+
+    function makeDraggable(panel, handle) {
+        let isDragging = false;
+        let startX = 0, startY = 0;
+        let initialLeft = 0, initialTop = 0;
+
+        handle.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || e.target.closest('.hse-header-btn')) return;
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = panel.getBoundingClientRect();
+            initialLeft = rect.left;
+            initialTop = rect.top;
+
+            panel.style.bottom = 'auto';
+            panel.style.right = 'auto';
+            panel.style.left = `${initialLeft}px`;
+            panel.style.top = `${initialTop}px`;
+            panel.classList.add('is-dragging');
+
+            const onMouseMove = (ev) => {
+                if (!isDragging) return;
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
+                const newLeft = Math.max(8, Math.min(window.innerWidth - rect.width - 8, initialLeft + dx));
+                const newTop = Math.max(8, Math.min(window.innerHeight - rect.height - 8, initialTop + dy));
+                panel.style.left = `${newLeft}px`;
+                panel.style.top = `${newTop}px`;
+            };
+
+            const onMouseUp = () => {
+                isDragging = false;
+                panel.classList.remove('is-dragging');
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+            };
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+    }
+
     // --- HSE_UI: Interface & Indicators ---
     const HSE_UI = {
         panel: null,
@@ -801,6 +901,13 @@
             if (!ind) {
                 ind = document.createElement('div');
                 ind.id = 'hse-flash-indicator';
+                const iconSpan = document.createElement('span');
+                iconSpan.className = 'hse-flash-icon';
+                iconSpan.appendChild(createSvgIcon('bolt'));
+                const textSpan = document.createElement('span');
+                textSpan.id = 'hse-flash-text';
+                ind.appendChild(iconSpan);
+                ind.appendChild(textSpan);
                 mount.appendChild(ind);
             } else if (ind.parentElement !== mount) {
                 mount.appendChild(ind);
@@ -811,10 +918,15 @@
         flash(text, isLong = false) {
             const ind = this.createIndicator();
             if (!ind) return;
-            ind.textContent = text;
+            const textSpan = ind.querySelector('#hse-flash-text');
+            if (textSpan) {
+                textSpan.textContent = text;
+            } else {
+                ind.textContent = text;
+            }
             ind.classList.add('is-visible');
             if (this.flashTimer) clearTimeout(this.flashTimer);
-            this.flashTimer = setTimeout(() => ind.classList.remove('is-visible'), isLong ? 2000 : 800);
+            this.flashTimer = setTimeout(() => ind.classList.remove('is-visible'), isLong ? 2000 : 900);
         },
 
         toggle() {
@@ -829,29 +941,49 @@
             if (this.panel) this.panel.remove();
 
             const info = HSE_Intel.getContentInfo();
-            HSE_Engine.currentSpeed = HSE_Store.getSpeedForShow(info.id);
+            const video = HSE_Intel.getVideo();
+            if (video && Number.isFinite(video.playbackRate) && video.playbackRate > 0) {
+                HSE_Engine.currentSpeed = sanitizeSpeed(video.playbackRate);
+            } else {
+                HSE_Engine.currentSpeed = HSE_Store.getSpeedForShow(info.id);
+            }
             HSE_Engine.lastContentId = info.id;
 
             const panel = document.createElement('div');
             panel.id = 'hs-speed-panel';
             panel.className = 'mode-vod';
 
-            // Build with DOM APIs — never interpolate page titles into innerHTML (XSS / leak surface).
+            // --- Header (Draggable) ---
             const header = document.createElement('div');
             header.id = 'hs-speed-header';
+
+            const headerLeft = document.createElement('div');
+            headerLeft.className = 'hse-header-left';
+
+            const badge = document.createElement('span');
+            badge.className = 'hse-badge';
+            const dot = document.createElement('span');
+            dot.className = 'hse-badge-dot';
+            const badgeText = document.createElement('span');
+            badgeText.textContent = Platform.label;
+            badge.appendChild(dot);
+            badge.appendChild(badgeText);
 
             const titleEl = document.createElement('span');
             titleEl.id = 'hs-speed-title';
             titleEl.textContent = info.title;
+            titleEl.title = info.title;
 
-            const badge = document.createElement('span');
-            badge.className = 'hse-badge';
-            badge.textContent = Platform.label;
+            headerLeft.appendChild(badge);
+            headerLeft.appendChild(titleEl);
 
-            const settingsBtn = document.createElement('span');
-            settingsBtn.className = 'hs-speed-settings-icon';
-            settingsBtn.innerHTML = '&#9881;';
-            settingsBtn.title = 'Open Settings';
+            const actions = document.createElement('div');
+            actions.className = 'hse-header-actions';
+
+            const settingsBtn = document.createElement('button');
+            settingsBtn.className = 'hse-header-btn';
+            settingsBtn.title = 'Open Settings (Preferences)';
+            settingsBtn.appendChild(createSvgIcon('gear'));
             settingsBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 try {
@@ -865,18 +997,84 @@
                 }
             });
 
-            const badgesContainer = document.createElement('div');
-            badgesContainer.className = 'hse-badges-container';
-            badgesContainer.appendChild(badge);
-            badgesContainer.appendChild(settingsBtn);
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'hse-header-btn hse-close-btn';
+            closeBtn.title = 'Close Speed Overlay';
+            closeBtn.appendChild(createSvgIcon('close'));
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.remove();
+            });
 
-            header.appendChild(titleEl);
-            header.appendChild(badgesContainer);
+            actions.appendChild(settingsBtn);
+            actions.appendChild(closeBtn);
 
-            const status = document.createElement('div');
-            status.id = 'hs-speed-status';
-            status.textContent = 'Initialising...';
+            header.appendChild(headerLeft);
+            header.appendChild(actions);
 
+            makeDraggable(panel, header);
+
+            // --- Hero Speed Controller Section ---
+            const heroSection = document.createElement('div');
+            heroSection.className = 'hse-hero-section';
+
+            const btnMinus = document.createElement('button');
+            btnMinus.className = 'hse-stepper-btn';
+            btnMinus.title = 'Decrease speed by 0.1x (Hotkey: [ )';
+            btnMinus.appendChild(createSvgIcon('minus'));
+            btnMinus.onclick = () => {
+                HSE_Engine.setSpeed(Math.max(0.1, +(HSE_Engine.currentSpeed - 0.1).toFixed(2)), true, true);
+                this.resetHideTimer();
+            };
+
+            const heroDisplay = document.createElement('div');
+            heroDisplay.className = 'hse-hero-display';
+
+            const heroVal = document.createElement('span');
+            heroVal.id = 'hse-hero-speed';
+            heroVal.textContent = HSE_Engine.currentSpeed.toFixed(2).replace(/\.00$/, '');
+
+            const heroUnit = document.createElement('span');
+            heroUnit.className = 'hse-hero-unit';
+            heroUnit.textContent = 'x';
+
+            heroDisplay.appendChild(heroVal);
+            heroDisplay.appendChild(heroUnit);
+
+            const btnPlus = document.createElement('button');
+            btnPlus.className = 'hse-stepper-btn';
+            btnPlus.title = 'Increase speed by 0.1x (Hotkey: ] )';
+            btnPlus.appendChild(createSvgIcon('plus'));
+            btnPlus.onclick = () => {
+                HSE_Engine.setSpeed(Math.min(MAX_SPEED, +(HSE_Engine.currentSpeed + 0.1).toFixed(2)), true, true);
+                this.resetHideTimer();
+            };
+
+            heroSection.appendChild(btnMinus);
+            heroSection.appendChild(heroDisplay);
+            heroSection.appendChild(btnPlus);
+
+            // Sub-hero row: 1.0x Normal quick-reset + status
+            const subHeroRow = document.createElement('div');
+            subHeroRow.className = 'hse-subhero-row';
+
+            const resetPill = document.createElement('button');
+            resetPill.className = 'hse-reset-pill';
+            resetPill.title = 'Reset to 1.0x Normal Speed (Hotkey: r)';
+            resetPill.textContent = '1.0x Normal';
+            resetPill.onclick = () => {
+                HSE_Engine.setSpeed(1.0, true, true);
+                this.resetHideTimer();
+            };
+
+            const statusText = document.createElement('span');
+            statusText.id = 'hs-speed-status';
+            statusText.textContent = `${HSE_Engine.currentSpeed}x Active`;
+
+            subHeroRow.appendChild(resetPill);
+            subHeroRow.appendChild(statusText);
+
+            // --- Presets Segmented Row ---
             const btnContainer = document.createElement('div');
             btnContainer.className = 'hs-speed-btn-container';
 
@@ -895,13 +1093,27 @@
                 btnContainer.appendChild(btn);
             });
 
-            // --- Smart Pace Finish-Time Section (Additive v2.4) ---
+            // --- Smart Pace Finish-Time Card ---
             const smartSec = document.createElement('div');
             smartSec.className = 'hs-smart-pace-section';
 
             const smartHeader = document.createElement('div');
             smartHeader.className = 'hs-smart-pace-header';
-            smartHeader.textContent = 'Smart Pace (Finish In)';
+
+            const smartTitleGroup = document.createElement('div');
+            smartTitleGroup.className = 'hs-smart-title-group';
+            smartTitleGroup.appendChild(createSvgIcon('bolt'));
+            const smartTitleText = document.createElement('span');
+            smartTitleText.textContent = 'Smart Pace Autopilot';
+            smartTitleGroup.appendChild(smartTitleText);
+
+            const smartBadge = document.createElement('span');
+            smartBadge.id = 'hse-smart-badge';
+            smartBadge.className = HSE_SmartPace.isActive ? 'hse-smart-badge active' : 'hse-smart-badge';
+            smartBadge.textContent = HSE_SmartPace.isActive ? 'Active' : 'Target';
+
+            smartHeader.appendChild(smartTitleGroup);
+            smartHeader.appendChild(smartBadge);
 
             const chipsRow = document.createElement('div');
             chipsRow.className = 'hs-smart-chips-row';
@@ -921,6 +1133,9 @@
             const inputRow = document.createElement('div');
             inputRow.className = 'hs-smart-input-row';
 
+            const inputWrap = document.createElement('div');
+            inputWrap.className = 'hs-smart-input-wrap';
+
             const input = document.createElement('input');
             input.type = 'number';
             input.id = 'hs-smart-input';
@@ -932,9 +1147,12 @@
             unitSpan.className = 'hs-smart-unit';
             unitSpan.textContent = 'min';
 
+            inputWrap.appendChild(input);
+            inputWrap.appendChild(unitSpan);
+
             const startBtn = document.createElement('button');
             startBtn.id = 'hs-smart-start-btn';
-            startBtn.className = 'hs-smart-btn';
+            startBtn.className = 'hs-smart-btn hs-smart-start';
             startBtn.textContent = HSE_SmartPace.isActive ? 'Update' : 'Start';
             startBtn.onclick = () => {
                 const val = parseInt(input.value, 10) || 30;
@@ -951,8 +1169,7 @@
                 this.resetHideTimer();
             };
 
-            inputRow.appendChild(input);
-            inputRow.appendChild(unitSpan);
+            inputRow.appendChild(inputWrap);
             inputRow.appendChild(startBtn);
             inputRow.appendChild(stopBtn);
 
@@ -969,9 +1186,18 @@
             smartSec.appendChild(smartStatus);
 
             panel.appendChild(header);
-            panel.appendChild(status);
+            panel.appendChild(heroSection);
+            panel.appendChild(subHeroRow);
             panel.appendChild(btnContainer);
             panel.appendChild(smartSec);
+
+            // Hover protection: user hovering over panel prevents auto-dismiss
+            panel.addEventListener('mouseenter', () => {
+                if (this.hideTimer) clearTimeout(this.hideTimer);
+            });
+            panel.addEventListener('mouseleave', () => {
+                this.resetHideTimer();
+            });
 
             document.body.appendChild(panel);
             this.panel = panel;
@@ -988,27 +1214,42 @@
             const titleEl = document.getElementById('hs-speed-title');
             if (titleEl) {
                 titleEl.textContent = HSE_Intel.getContentInfo().title;
+                titleEl.title = titleEl.textContent;
             }
+            const heroVal = document.getElementById('hse-hero-speed');
+            if (heroVal) {
+                heroVal.textContent = speed.toFixed(2).replace(/\.00$/, '');
+            }
+            this.updateStatus();
             this.updateSmartPaceStatus(speed);
         },
 
         updateStatus(text) {
             const status = document.getElementById('hs-speed-status');
             if (status) {
-                status.textContent = text || `Current Speed: ${HSE_Engine.currentSpeed}x`;
+                status.textContent = text || `${HSE_Engine.currentSpeed}x Active`;
             }
         },
 
         updateSmartPaceStatus(reqSpeed) {
             const el = document.getElementById('hs-smart-status');
+            const badge = document.getElementById('hse-smart-badge');
             if (el) {
                 if (HSE_SmartPace.isActive) {
                     const video = HSE_Intel.getVideo();
                     const remSec = (video && Number.isFinite(video.duration)) ? Math.max(0, Math.round(video.duration - video.currentTime)) : 0;
                     const remMin = Math.ceil(remSec / 60);
-                    el.textContent = `Smart Pace: ${reqSpeed.toFixed(2)}x (${remMin}m video left)`;
+                    el.textContent = `${reqSpeed.toFixed(2)}x · ${remMin}m video left (${HSE_SmartPace.targetMinutes}m target)`;
+                    if (badge) {
+                        badge.className = 'hse-smart-badge active';
+                        badge.textContent = 'Active';
+                    }
                 } else {
                     el.textContent = '';
+                    if (badge) {
+                        badge.className = 'hse-smart-badge';
+                        badge.textContent = 'Target';
+                    }
                 }
             }
             const startBtn = document.getElementById('hs-smart-start-btn');
@@ -1022,7 +1263,7 @@
             this.hideTimer = setTimeout(() => {
                 if (this.panel) {
                     this.panel.classList.add('fade-out');
-                    setTimeout(() => this.remove(), 400);
+                    setTimeout(() => this.remove(), 350);
                 }
             }, 5000);
         },
@@ -1104,6 +1345,22 @@
         setInterval(() => {
             HSE_Engine.enforce();
         }, REFRESH_MS);
+
+        // Instantly adopt speed changes initiated by platform controls (YouTube, Hotstar, Netflix, etc.)
+        window.addEventListener('hs-platform-speed-change', (e) => {
+            if (e.detail && Number.isFinite(e.detail.speed)) {
+                HSE_Engine.adoptPlatformSpeed(e.detail.speed);
+            }
+        });
+
+        window.addEventListener('ratechange', (e) => {
+            if (e.target && e.target.tagName === 'VIDEO') {
+                const rate = e.target.playbackRate;
+                if (Number.isFinite(rate) && rate > 0 && Math.abs(rate - HSE_Engine.currentSpeed) > 0.01) {
+                    HSE_Engine.adoptPlatformSpeed(rate);
+                }
+            }
+        }, true);
 
         const loadInitialSpeed = () => {
             HSE_Engine.lastContentId = null;

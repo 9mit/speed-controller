@@ -1,6 +1,6 @@
 {
   "name": "ott-speed-playback",
-  "version": "4.5.0",
+  "version": "5.0.0",
   "description": "Control playback speed with Smart Pace finish-time targeting and custom presets on YouTube and popular streaming services.",
   "private": true,
   "scripts": {

@@ -1,19 +1,21 @@
-# OTT SPEED PLAYBACK (v4.5)
+# OTT SPEED PLAYBACK (v5.0)
 ### High-performance playback speed controller with Smart Pace finish-time targeting for popular streaming services.
 
 <img src="icon128.png" width="128" height="128" alt="OTT SPEED PLAYBACK Logo">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-4.5-green.svg)](manifest.json)
+[![Version](https://img.shields.io/badge/Version-5.0-green.svg)](manifest.json)
 [![Platform](https://img.shields.io/badge/Platform-Chrome%20|%20Edge%20|%20Firefox-lightgrey.svg)](manifest.json)
 
 ---
 
 ## Overview
 
-**OTT SPEED PLAYBACK** gives you complete, robust control over your video playback speed across YouTube, YouTube Shorts, and major streaming / OTT platforms. Version 4.5 features **Smart Pace Finish-Time Mode**—allowing you to choose how much time you have, and automatically calculating the optimal playback rate to finish right on schedule.
+**OTT SPEED PLAYBACK** gives you complete, robust control over your video playback speed across YouTube, YouTube Shorts, and major streaming / OTT platforms. Version 5.0 brings a handcrafted, studio-grade UI redesign, seamless co-existence with native player speed setters (YouTube 2x, 1.5x, etc.), and **Smart Pace Finish-Time Mode**—allowing you to choose how much time you have, and automatically calculating the optimal playback rate to finish right on schedule.
 
-### What Makes v4.5 Special:
+### What Makes v5.0 Special:
+- **Bi-Directional Native Player Compatibility**: Adjusting speed natively via the platform's player menu (e.g. YouTube 2x, 1.5x, Normal) works seamlessly without conflicts or overrides. The extension automatically syncs and reflects the chosen speed.
+- **Studio-Grade Tactile UI**: Redesigned from the ground up with obsidian glassmorphism, tabular monospace numerals, draggable header, smooth micro-interactions, non-intrusive floating HUD pill indicator, and an executive settings dashboard.
 - **Zero Quality Drops (`main_world.js`)**: Neutralizes aggressive Adaptive Bitrate (ABR) downshifting in Shaka Player and Hls.js during high-speed playback, keeping video crystal clear in 1080p/4K.
 - **Smart Pace Finish-Time Mode**: Select quick target finish times (`20m`, `30m`, `45m`, `60m`) or enter a custom duration in minutes. The controller calculates exact playback speed based on remaining video duration versus remaining wall time.
 - **Pause-Aware & Seek-Aware**: Wall time automatically freezes while video is paused, and required speed instantly recalculates if you seek forward or backward.
@@ -68,7 +70,7 @@
 ## Technical Architecture
 
 ```text
-OTT SPEED PLAYBACK v4.5
+OTT SPEED PLAYBACK v5.0
  ├── main_world.js             (ABR bitrate neutralizer, Shaka/Hls protection)
  ├── background.js             (Service worker, toolbar action click toggle, options router)
  ├── content.js

@@ -1,5 +1,5 @@
 /**
- * OTT SPEED PLAYBACK - Main World Engine (v4.1.0)
+ * OTT SPEED PLAYBACK - Main World Engine (v5.0.0)
  * Runs in the page context (MAIN world) at document_start.
  * Enforces playback rate on streaming services (Hotstar, Netflix, Prime Video, etc.)
  * and preserves video quality/resolution during speed changes by neutralizing
@@ -140,19 +140,36 @@
 
                 Object.defineProperty(mediaProto, 'playbackRate', {
                     get() {
-                        const speed = getActiveSpeed();
-                        if (speed && Math.abs(speed - 1.0) > 0.01) {
-                            return speed;
-                        }
                         return origGet.call(this);
                     },
                     set(val) {
-                        const speed = getActiveSpeed();
-                        if (speed && Math.abs(speed - 1.0) > 0.01) {
-                            // If user has chosen a custom speed, lock native video element to user's speed
-                            return origSet.call(this, speed);
+                        const n = Number(val);
+                        if (!Number.isFinite(n) || n <= 0) {
+                            return origSet.call(this, val);
                         }
-                        return origSet.call(this, val);
+                        const clamped = Math.min(16, Math.max(0.0625, n));
+                        const res = origSet.call(this, clamped);
+
+                        try {
+                            if (origDefaultSet) {
+                                origDefaultSet.call(this, clamped);
+                            }
+                        } catch (_) {}
+
+                        // Propagate speed change to extension and player ABR managers
+                        const currentActive = getActiveSpeed();
+                        if (Math.abs(clamped - currentActive) > 0.01) {
+                            if (document.documentElement) {
+                                document.documentElement.dataset.hsePlaybackRate = String(clamped);
+                            }
+                            for (const p of activeShakaPlayers) {
+                                applyShakaSpeedConfig(p, clamped);
+                            }
+                            window.dispatchEvent(new CustomEvent('hs-platform-speed-change', {
+                                detail: { speed: clamped }
+                            }));
+                        }
+                        return res;
                     },
                     configurable: true,
                     enumerable: true
@@ -166,18 +183,15 @@
 
                 Object.defineProperty(mediaProto, 'defaultPlaybackRate', {
                     get() {
-                        const speed = getActiveSpeed();
-                        if (speed && Math.abs(speed - 1.0) > 0.01) {
-                            return speed;
-                        }
-                        return origDefaultGet.call(this);
+                        return origDefaultGet ? origDefaultGet.call(this) : (origGet ? origGet.call(this) : 1.0);
                     },
                     set(val) {
-                        const speed = getActiveSpeed();
-                        if (speed && Math.abs(speed - 1.0) > 0.01) {
-                            return origDefaultSet.call(this, speed);
+                        const n = Number(val);
+                        if (!Number.isFinite(n) || n <= 0) {
+                            return origDefaultSet ? origDefaultSet.call(this, val) : undefined;
                         }
-                        return origDefaultSet.call(this, val);
+                        const clamped = Math.min(16, Math.max(0.0625, n));
+                        return origDefaultSet ? origDefaultSet.call(this, clamped) : undefined;
                     },
                     configurable: true,
                     enumerable: true
@@ -186,46 +200,80 @@
         } catch (_) {}
     }
 
+    let isApplyingSpeed = false;
     function applySpeedToAllVideos(speed) {
         if (!Number.isFinite(speed) || speed < 0.1 || speed > 16) return;
-        const videos = collectAllVideos(document);
-        for (const v of videos) {
-            if (v && v.isConnected) {
-                try {
-                    if (origSet) {
-                        origSet.call(v, speed);
-                    } else {
-                        v.playbackRate = speed;
-                    }
-                    if (origDefaultSet) {
-                        origDefaultSet.call(v, speed);
-                    } else {
-                        v.defaultPlaybackRate = speed;
-                    }
-                    // Trigger synthetic ratechange if player UI needs notification
-                    v.dispatchEvent(new Event('ratechange'));
-                } catch (_) {}
+        isApplyingSpeed = true;
+        try {
+            const videos = collectAllVideos(document);
+            for (const v of videos) {
+                if (v && v.isConnected) {
+                    try {
+                        if (origSet) {
+                            origSet.call(v, speed);
+                        } else {
+                            v.playbackRate = speed;
+                        }
+                        if (origDefaultSet) {
+                            origDefaultSet.call(v, speed);
+                        } else {
+                            v.defaultPlaybackRate = speed;
+                        }
+                        // Trigger synthetic ratechange if player UI needs notification
+                        v.dispatchEvent(new Event('ratechange'));
+                    } catch (_) {}
+                }
             }
+        } finally {
+            isApplyingSpeed = false;
         }
     }
 
-    // Capture-phase event listeners to keep rate synchronized during player lifecycle
-    const mediaEvents = ['play', 'playing', 'ratechange', 'loadedmetadata', 'canplay'];
+    // Capture-phase event listeners to keep rate synchronized during player lifecycle (new video loads / unpause)
+    const mediaEvents = ['play', 'playing', 'loadedmetadata', 'canplay'];
     mediaEvents.forEach(evt => {
         window.addEventListener(evt, (e) => {
             if (e.target && e.target.tagName === 'VIDEO') {
                 const speed = getActiveSpeed();
                 if (speed && Math.abs(speed - 1.0) > 0.01) {
                     try {
-                        if (origSet) origSet.call(e.target, speed);
-                        else e.target.playbackRate = speed;
-                        if (origDefaultSet) origDefaultSet.call(e.target, speed);
-                        else e.target.defaultPlaybackRate = speed;
+                        const current = origGet ? origGet.call(e.target) : e.target.playbackRate;
+                        if (Math.abs(current - speed) > 0.01) {
+                            if (origSet) origSet.call(e.target, speed);
+                            else e.target.playbackRate = speed;
+                            if (origDefaultSet) origDefaultSet.call(e.target, speed);
+                            else e.target.defaultPlaybackRate = speed;
+                        }
                     } catch (_) {}
                 }
             }
         }, true);
     });
+
+    // Listen for ratechange events from platform controls or user actions
+    window.addEventListener('ratechange', (e) => {
+        if (isApplyingSpeed) return;
+        if (e.target && e.target.tagName === 'VIDEO') {
+            try {
+                const current = origGet ? origGet.call(e.target) : e.target.playbackRate;
+                if (Number.isFinite(current) && current > 0) {
+                    const activeSpeed = getActiveSpeed();
+                    if (Math.abs(current - activeSpeed) > 0.01) {
+                        const clamped = Math.min(16, Math.max(0.1, current));
+                        if (document.documentElement) {
+                            document.documentElement.dataset.hsePlaybackRate = String(clamped);
+                        }
+                        for (const p of activeShakaPlayers) {
+                            applyShakaSpeedConfig(p, clamped);
+                        }
+                        window.dispatchEvent(new CustomEvent('hs-platform-speed-change', {
+                            detail: { speed: clamped }
+                        }));
+                    }
+                }
+            } catch (_) {}
+        }
+    }, true);
 
     // --- 3. Shaka Player & Hotstar Engine ABR & Quality Preservation ---
     const activeShakaPlayers = new Set();

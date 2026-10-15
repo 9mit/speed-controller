@@ -1,5 +1,5 @@
 /**
- * OTT SPEED PLAYBACK - Options Page Controller (v4.5)
+ * OTT SPEED PLAYBACK - Options Page Controller (v5.0)
  */
 
 const DEFAULT_SETTINGS = {
@@ -23,6 +23,26 @@ function formatKey(e) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Tab Navigation
+    const navTabs = document.querySelectorAll('.nav-tab');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    navTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetId = tab.dataset.tab;
+            if (!targetId) return;
+
+            navTabs.forEach(t => t.classList.remove('active'));
+            tabPanels.forEach(p => p.classList.remove('active'));
+
+            tab.classList.add('active');
+            const targetPanel = document.getElementById(targetId);
+            if (targetPanel) {
+                targetPanel.classList.add('active');
+            }
+        });
+    });
+
     const inputs = document.querySelectorAll('.hotkey-input');
     const selectSmartSpeed = document.getElementById('smartSpeedValue');
     const selectSpeedStep = document.getElementById('speedStep');
