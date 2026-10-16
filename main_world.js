@@ -1,7 +1,7 @@
 /**
- * OTT SPEED PLAYBACK - Main World Engine (v5.0.0)
+ * OTT SPEED PLAYBACK - Main World Engine (v5.1.0)
  * Runs in the page context (MAIN world) at document_start.
- * Enforces playback rate on streaming services (Hotstar, Netflix, Prime Video, etc.)
+ * Enforces playback rate on streaming services (Hotstar, Netflix, Prime Video, YouTube, etc.)
  * and preserves video quality/resolution during speed changes by neutralizing
  * Adaptive Bitrate (ABR) quality downgrades, buffer-drain triggers, and frame-drop penalties.
  */
@@ -14,6 +14,18 @@
 
     if (document.documentElement) {
         document.documentElement.dataset.hseMainWorldLoaded = 'true';
+    }
+
+    // --- User Gesture Tracking (distinguish user speed clicks from automated player resets) ---
+    let lastUserGestureTime = 0;
+    ['click', 'keydown', 'pointerdown'].forEach(type => {
+        window.addEventListener(type, (e) => {
+            if (e.isTrusted) lastUserGestureTime = Date.now();
+        }, { capture: true, passive: true });
+    });
+
+    function isRecentUserGesture() {
+        return (Date.now() - lastUserGestureTime) < 600;
     }
 
     // --- Active Video Discovery (including open Shadow DOM) ---
@@ -44,7 +56,7 @@
     function getActiveSpeed() {
         const raw = document.documentElement?.dataset?.hsePlaybackRate;
         const datasetSpeed = parseFloat(raw);
-        if (Number.isFinite(datasetSpeed) && datasetSpeed >= 0.1 && datasetSpeed <= 16) {
+        if (Number.isFinite(datasetSpeed) && datasetSpeed >= 0.25 && datasetSpeed <= 16) {
             return datasetSpeed;
         }
         return 1.0;
@@ -56,30 +68,32 @@
     // and lower video resolution to 360p/480p. Neutralizing dropped frame count prevents this downgrade.
     try {
         if (typeof VideoPlaybackQuality !== 'undefined' && VideoPlaybackQuality.prototype) {
-            Object.defineProperty(VideoPlaybackQuality.prototype, 'droppedVideoFrames', {
-                get() { return 0; },
-                configurable: true,
-                enumerable: true
-            });
-            Object.defineProperty(VideoPlaybackQuality.prototype, 'corruptedVideoFrames', {
-                get() { return 0; },
-                configurable: true,
-                enumerable: true
-            });
+            const descDropped = Object.getOwnPropertyDescriptor(VideoPlaybackQuality.prototype, 'droppedVideoFrames');
+            if (descDropped && descDropped.configurable) {
+                Object.defineProperty(VideoPlaybackQuality.prototype, 'droppedVideoFrames', {
+                    get() { return 0; },
+                    configurable: true,
+                    enumerable: true
+                });
+            }
+            const descCorrupted = Object.getOwnPropertyDescriptor(VideoPlaybackQuality.prototype, 'corruptedVideoFrames');
+            if (descCorrupted && descCorrupted.configurable) {
+                Object.defineProperty(VideoPlaybackQuality.prototype, 'corruptedVideoFrames', {
+                    get() { return 0; },
+                    configurable: true,
+                    enumerable: true
+                });
+            }
         }
     } catch (_) {}
 
     const qualityProxyHandler = {
-        get(target, prop) {
+        get(target, prop, receiver) {
             if (prop === 'droppedVideoFrames' || prop === 'corruptedVideoFrames') {
                 return 0;
             }
-            try {
-                const val = target[prop];
-                return typeof val === 'function' ? val.bind(target) : val;
-            } catch (_) {
-                return 0;
-            }
+            const val = Reflect.get(target, prop, receiver);
+            return typeof val === 'function' ? val.bind(target) : val;
         }
     };
 
@@ -91,20 +105,11 @@
                 if (!quality) return quality;
                 const speed = getActiveSpeed();
                 if (speed > 1.05) {
-                    try {
-                        Object.defineProperty(quality, 'droppedVideoFrames', { value: 0, configurable: true });
-                        Object.defineProperty(quality, 'corruptedVideoFrames', { value: 0, configurable: true });
-                    } catch (_) {}
                     return new Proxy(quality, qualityProxyHandler);
                 }
                 return quality;
             } catch (_) {
-                return {
-                    creationTime: performance.now(),
-                    droppedVideoFrames: 0,
-                    totalVideoFrames: 60,
-                    corruptedVideoFrames: 0
-                };
+                return origGetQuality.call(this);
             }
         };
     }
@@ -112,7 +117,7 @@
     // Override webkitDroppedFrameCount getter if defined
     try {
         const desc = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'webkitDroppedFrameCount');
-        if (desc && desc.get) {
+        if (desc && desc.get && desc.configurable) {
             Object.defineProperty(HTMLVideoElement.prototype, 'webkitDroppedFrameCount', {
                 get() { return 0; },
                 configurable: true,
@@ -130,6 +135,7 @@
     let origSet = null;
     let origDefaultGet = null;
     let origDefaultSet = null;
+    let isApplyingSpeed = false;
 
     if (mediaProto) {
         try {
@@ -147,18 +153,34 @@
                         if (!Number.isFinite(n) || n <= 0) {
                             return origSet.call(this, val);
                         }
-                        const clamped = Math.min(16, Math.max(0.0625, n));
+
+                        if (isApplyingSpeed) {
+                            return origSet.call(this, n);
+                        }
+
+                        const activeSpeed = getActiveSpeed();
+
+                        // If set by a background player script without trusted user gesture (e.g. autoplay next episode),
+                        // preserve the user's active speed setting instead of letting player reset to 1.0x or 0.1x!
+                        if (!isRecentUserGesture() && Math.abs(activeSpeed - 1.0) > 0.01 && Math.abs(n - 1.0) < 0.01) {
+                            return origSet.call(this, activeSpeed);
+                        }
+
+                        const clamped = Math.min(16, Math.max(0.25, n));
                         const res = origSet.call(this, clamped);
 
                         try {
                             if (origDefaultSet) {
                                 origDefaultSet.call(this, clamped);
                             }
+                            if (this.preservesPitch === false) {
+                                this.preservesPitch = true;
+                            }
                         } catch (_) {}
 
-                        // Propagate speed change to extension and player ABR managers
-                        const currentActive = getActiveSpeed();
-                        if (Math.abs(clamped - currentActive) > 0.01) {
+                        // If this was initiated by a genuine user interaction in the native player UI (e.g. YouTube menu),
+                        // sync the chosen rate with the extension
+                        if (isRecentUserGesture() && Math.abs(clamped - activeSpeed) > 0.01) {
                             if (document.documentElement) {
                                 document.documentElement.dataset.hsePlaybackRate = String(clamped);
                             }
@@ -190,7 +212,7 @@
                         if (!Number.isFinite(n) || n <= 0) {
                             return origDefaultSet ? origDefaultSet.call(this, val) : undefined;
                         }
-                        const clamped = Math.min(16, Math.max(0.0625, n));
+                        const clamped = Math.min(16, Math.max(0.25, n));
                         return origDefaultSet ? origDefaultSet.call(this, clamped) : undefined;
                     },
                     configurable: true,
@@ -200,9 +222,8 @@
         } catch (_) {}
     }
 
-    let isApplyingSpeed = false;
     function applySpeedToAllVideos(speed) {
-        if (!Number.isFinite(speed) || speed < 0.1 || speed > 16) return;
+        if (!Number.isFinite(speed) || speed < 0.25 || speed > 16) return;
         isApplyingSpeed = true;
         try {
             const videos = collectAllVideos(document);
@@ -219,8 +240,9 @@
                         } else {
                             v.defaultPlaybackRate = speed;
                         }
-                        // Trigger synthetic ratechange if player UI needs notification
-                        v.dispatchEvent(new Event('ratechange'));
+                        if (v.preservesPitch === false) {
+                            v.preservesPitch = true;
+                        }
                     } catch (_) {}
                 }
             }
@@ -229,13 +251,13 @@
         }
     }
 
-    // Capture-phase event listeners to keep rate synchronized during player lifecycle (new video loads / unpause)
+    // Capture-phase event listeners to keep rate synchronized during player lifecycle (new video loads, next episode, unpause)
     const mediaEvents = ['play', 'playing', 'loadedmetadata', 'canplay'];
     mediaEvents.forEach(evt => {
         window.addEventListener(evt, (e) => {
             if (e.target && e.target.tagName === 'VIDEO') {
                 const speed = getActiveSpeed();
-                if (speed && Math.abs(speed - 1.0) > 0.01) {
+                if (Number.isFinite(speed) && speed >= 0.25) {
                     try {
                         const current = origGet ? origGet.call(e.target) : e.target.playbackRate;
                         if (Math.abs(current - speed) > 0.01) {
@@ -244,22 +266,28 @@
                             if (origDefaultSet) origDefaultSet.call(e.target, speed);
                             else e.target.defaultPlaybackRate = speed;
                         }
+                        if (e.target.preservesPitch === false) {
+                            e.target.preservesPitch = true;
+                        }
                     } catch (_) {}
                 }
             }
         }, true);
     });
 
-    // Listen for ratechange events from platform controls or user actions
+    // Listen for ratechange events: adopt only on user gesture, re-enforce active speed on automatic player resets
     window.addEventListener('ratechange', (e) => {
         if (isApplyingSpeed) return;
         if (e.target && e.target.tagName === 'VIDEO') {
             try {
                 const current = origGet ? origGet.call(e.target) : e.target.playbackRate;
-                if (Number.isFinite(current) && current > 0) {
-                    const activeSpeed = getActiveSpeed();
-                    if (Math.abs(current - activeSpeed) > 0.01) {
-                        const clamped = Math.min(16, Math.max(0.1, current));
+                if (!Number.isFinite(current) || current <= 0) return;
+
+                const activeSpeed = getActiveSpeed();
+                if (Math.abs(current - activeSpeed) > 0.01) {
+                    if (isRecentUserGesture()) {
+                        // User interacted with platform native speed control (e.g. YouTube gear menu)
+                        const clamped = Math.min(16, Math.max(0.25, current));
                         if (document.documentElement) {
                             document.documentElement.dataset.hsePlaybackRate = String(clamped);
                         }
@@ -269,6 +297,12 @@
                         window.dispatchEvent(new CustomEvent('hs-platform-speed-change', {
                             detail: { speed: clamped }
                         }));
+                    } else {
+                        // Background player reset (next episode autoplay / buffer reset) - re-enforce user's speed!
+                        if (origSet) origSet.call(e.target, activeSpeed);
+                        else e.target.playbackRate = activeSpeed;
+                        if (origDefaultSet) origDefaultSet.call(e.target, activeSpeed);
+                        else e.target.defaultPlaybackRate = activeSpeed;
                     }
                 }
             } catch (_) {}
@@ -284,8 +318,8 @@
             if (speed > 1.05) {
                 player.configure({
                     abr: {
-                        bandwidthDowngradeTarget: 0.001,
-                        switchInterval: 999999
+                        bandwidthDowngradeTarget: 0.85,
+                        switchInterval: 4
                     },
                     streaming: {
                         bufferingGoal: Math.max(30, Math.round(20 * Math.min(speed, 3))),
@@ -334,23 +368,13 @@
         // 3a. Hook SimpleAbrManager:
         // By default, Shaka multiplies required bitrate by playbackRate in chooseByBandwidth:
         // a = (rate * variant.bandwidth) / bandwidthDowngradeTarget.
-        // When rate = 1.5x or 2.0x, Shaka falsely thinks the network is inadequate and downshifts to 360p!
-        // Forcing rate = 1.0 in playbackRateChanged and chooseByBandwidth neutralizes this penalty!
+        // Forcing rate = 1.0 in playbackRateChanged neutralizes this artificial penalty!
         if (shakaObj.abr && shakaObj.abr.SimpleAbrManager && shakaObj.abr.SimpleAbrManager.prototype) {
             const abrProto = shakaObj.abr.SimpleAbrManager.prototype;
             const origRateChanged = abrProto.playbackRateChanged;
             if (origRateChanged) {
                 abrProto.playbackRateChanged = function (rate) {
-                    // Always report 1.0 to ABR bandwidth allocator so video resolution does not downgrade
                     return origRateChanged.call(this, 1.0);
-                };
-            }
-
-            const origChooseByBandwidth = abrProto.chooseByBandwidth;
-            if (origChooseByBandwidth) {
-                abrProto.chooseByBandwidth = function (variants, estimatedBandwidth) {
-                    this.B = 1.0; // Minified Shaka internal rate variable
-                    return origChooseByBandwidth.apply(this, arguments);
                 };
             }
         }
@@ -366,8 +390,8 @@
                     if (speed > 1.05 && typeof config === 'object' && config !== null) {
                         try {
                             if (config.abr) {
-                                config.abr.bandwidthDowngradeTarget = 0.001;
-                                config.abr.switchInterval = 999999;
+                                config.abr.bandwidthDowngradeTarget = 0.85;
+                                config.abr.switchInterval = 4;
                             }
                             if (config.streaming) {
                                 if (!config.streaming._hse_base_bufferingGoal) {
@@ -469,8 +493,8 @@
                                 config.streaming.rebufferingGoal = 2;
                             }
                             if (config.abr) {
-                                config.abr.bandwidthDowngradeTarget = 0.001;
-                                config.abr.switchInterval = 999999;
+                                config.abr.bandwidthDowngradeTarget = 0.85;
+                                config.abr.switchInterval = 4;
                             }
                         } catch (_) {}
                     }
@@ -527,9 +551,6 @@
                 try {
                     const speed = getActiveSpeed();
                     if (speed > 1.05 && this.config) {
-                        if (this.currentLevel !== -1 && this.currentLevel != null) {
-                            this.autoLevelEnabled = false;
-                        }
                         if (!this.config._hse_base_maxBufferLength) {
                             this.config._hse_base_maxBufferLength = this.config.maxBufferLength || 30;
                         }

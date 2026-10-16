@@ -1,5 +1,5 @@
 /**
- * OTT SPEED PLAYBACK (v5.0)
+ * OTT SPEED PLAYBACK (v5.1)
  * Playback rate control for YouTube, YouTube Shorts, Hotstar, JioHotstar, Netflix, Prime Video,
  * ZEE5, Airtel Xstream, JioCinema, SonyLIV, Aha, Hoichoi, Sun NXT, and MX Player.
  * Built with Smart Pace finish-time mode and adaptive speed targeting.
@@ -77,10 +77,10 @@
         return title || 'Current Video';
     }
 
-    function sanitizeSpeed(value, fallback = 1) {
+    function sanitizeSpeed(value, fallback = 1.0) {
         const n = Number(value);
-        if (!Number.isFinite(n)) return fallback;
-        return Math.min(MAX_SPEED, Math.max(0.1, n));
+        if (!Number.isFinite(n) || n <= 0) return fallback;
+        return Math.min(MAX_SPEED, Math.max(0.25, Math.round(n * 100) / 100));
     }
 
     // --- Platform adapters (Protected v2.3 implementation) ---
@@ -434,7 +434,8 @@
     // --- HSE_Store: Persistence & Settings (local-only; no sync / no network) ---
     const HSE_Store = {
         settings: {
-            globalSpeed: 1,
+            defaultSpeed: 1.0,
+            globalSpeed: 1.0,
             showSpeeds: {},
             paceProfile: {
                 averageSpeed: 1.0,
@@ -457,8 +458,16 @@
          */
         hydrateFromStorage(raw, customRaw) {
             if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+                if (typeof raw.defaultSpeed === 'number') {
+                    const def = sanitizeSpeed(raw.defaultSpeed, 1.0);
+                    this.settings.defaultSpeed = (def < 0.25) ? 1.0 : def;
+                }
+
                 if (typeof raw.globalSpeed === 'number') {
-                    this.settings.globalSpeed = sanitizeSpeed(raw.globalSpeed, 1);
+                    const fallback = this.settings.defaultSpeed || 1.0;
+                    const speed = sanitizeSpeed(raw.globalSpeed, fallback);
+                    // Recover from any previously corrupted legacy 0.1x speeds
+                    this.settings.globalSpeed = (speed < 0.25) ? fallback : speed;
                 }
 
                 const speeds = raw.showSpeeds;
@@ -468,7 +477,10 @@
                         if (typeof key !== 'string' || key.length > 64) continue;
                         if (!/^[a-z0-9:_-]+$/i.test(key)) continue;
                         if (typeof value !== 'number') continue;
-                        cleaned[key] = sanitizeSpeed(value);
+                        const s = sanitizeSpeed(value, 1.0);
+                        if (s >= 0.25) {
+                            cleaned[key] = s;
+                        }
                     }
                     this.settings.showSpeeds = cleaned;
                 }
@@ -476,7 +488,7 @@
                 if (raw.paceProfile && typeof raw.paceProfile === 'object') {
                     const avg = Number(raw.paceProfile.averageSpeed);
                     const cnt = Number(raw.paceProfile.sampleCount);
-                    if (Number.isFinite(avg) && avg >= 0.1 && avg <= MAX_SPEED) {
+                    if (Number.isFinite(avg) && avg >= 0.25 && avg <= MAX_SPEED) {
                         this.settings.paceProfile.averageSpeed = avg;
                     }
                     if (Number.isFinite(cnt) && cnt >= 0) {
@@ -508,8 +520,12 @@
                 if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime?.id) {
                     return;
                 }
+                const currentData = await chrome.storage.local.get(['hse_settings']).catch(() => ({}));
+                const existing = (currentData && currentData.hse_settings && typeof currentData.hse_settings === 'object') ? currentData.hse_settings : {};
                 const payload = {
                     hse_settings: {
+                        ...existing,
+                        defaultSpeed: this.settings.defaultSpeed,
                         globalSpeed: this.settings.globalSpeed,
                         showSpeeds: this.settings.showSpeeds,
                         paceProfile: this.settings.paceProfile
@@ -526,21 +542,28 @@
         },
 
         getSpeedForShow(showId) {
+            const fallback = this.settings.defaultSpeed || 1.0;
             const key = this.storageKey(showId);
-            // Prefer platform-namespaced key; fall back to bare Hotstar IDs for migration
-            if (this.settings.showSpeeds[key] != null) {
-                return this.settings.showSpeeds[key];
+            // Check specific title speed if available and valid
+            if (showId && showId !== 'generic' && this.settings.showSpeeds[key] != null) {
+                const s = sanitizeSpeed(this.settings.showSpeeds[key], fallback);
+                if (s >= 0.25) return s;
             }
-            if (Platform.id === 'hotstar' && this.settings.showSpeeds[showId] != null) {
-                return this.settings.showSpeeds[showId];
+            if (Platform.id === 'hotstar' && showId && showId !== 'generic' && this.settings.showSpeeds[showId] != null) {
+                const s = sanitizeSpeed(this.settings.showSpeeds[showId], fallback);
+                if (s >= 0.25) return s;
             }
-            return this.settings.globalSpeed;
+            // Fall back to active user global speed (e.g. 2.0x set on first episode)
+            const global = sanitizeSpeed(this.settings.globalSpeed, fallback);
+            return (global >= 0.25) ? global : fallback;
         },
 
         setSpeedForShow(showId, speed) {
-            const clamped = sanitizeSpeed(speed);
-            this.settings.showSpeeds[this.storageKey(showId)] = clamped;
+            const clamped = sanitizeSpeed(speed, 1.0);
             this.settings.globalSpeed = clamped;
+            if (showId && showId !== 'generic') {
+                this.settings.showSpeeds[this.storageKey(showId)] = clamped;
+            }
             this.save();
         },
 
@@ -594,11 +617,11 @@
 
     // --- HSE_Engine: Action & Enforcement ---
     const HSE_Engine = {
-        currentSpeed: 1,
+        currentSpeed: 1.0,
         lastContentId: null,
 
         setSpeed(speed, isPersistent = true, isManual = false) {
-            const clamped = sanitizeSpeed(speed);
+            const clamped = sanitizeSpeed(speed, 1.0);
             this.currentSpeed = clamped;
             document.documentElement.dataset.hsePlaybackRate = String(clamped);
 
@@ -608,12 +631,17 @@
 
             const video = HSE_Intel.getVideo();
             if (video) {
-                if (Math.abs(video.playbackRate - clamped) > 0.01) {
-                    video.playbackRate = clamped;
-                }
-                if (Math.abs(video.defaultPlaybackRate - clamped) > 0.01) {
-                    video.defaultPlaybackRate = clamped;
-                }
+                try {
+                    if (Math.abs(video.playbackRate - clamped) > 0.01) {
+                        video.playbackRate = clamped;
+                    }
+                    if (Math.abs(video.defaultPlaybackRate - clamped) > 0.01) {
+                        video.defaultPlaybackRate = clamped;
+                    }
+                    if (video.preservesPitch === false) {
+                        video.preservesPitch = true;
+                    }
+                } catch (_) {}
             }
 
             if (isPersistent) {
@@ -632,7 +660,8 @@
         },
 
         adoptPlatformSpeed(speed) {
-            const clamped = sanitizeSpeed(speed);
+            const clamped = sanitizeSpeed(speed, 1.0);
+            if (clamped < 0.25) return;
             if (Math.abs(this.currentSpeed - clamped) < 0.01) return;
 
             this.currentSpeed = clamped;
@@ -656,16 +685,12 @@
             if (info.id === this.lastContentId) return;
             this.lastContentId = info.id;
 
-            const key = HSE_Store.storageKey(info.id);
-            const hasSavedSpeed = HSE_Store.settings.showSpeeds[key] != null;
-            const video = HSE_Intel.getVideo();
+            // When navigating to a new episode/content, maintain the active user speed!
+            const targetSpeed = (this.currentSpeed >= 0.25)
+                ? this.currentSpeed
+                : HSE_Store.getSpeedForShow(info.id);
 
-            if (!hasSavedSpeed && video && Number.isFinite(video.playbackRate) && Math.abs(video.playbackRate - 1.0) > 0.01) {
-                this.adoptPlatformSpeed(video.playbackRate);
-            } else {
-                const saved = HSE_Store.getSpeedForShow(info.id);
-                this.setSpeed(saved, false, false);
-            }
+            this.setSpeed(targetSpeed, true, false);
             HSE_UI.update();
         },
 
@@ -680,10 +705,21 @@
             if (!video) return;
 
             const target = this.currentSpeed;
-            const currentRate = video.playbackRate;
-            if (Math.abs(currentRate - target) > 0.01) {
-                // If the video's rate diverged, adopt the platform speed rather than forcefully overwriting it!
-                this.adoptPlatformSpeed(currentRate);
+            if (Number.isFinite(target) && target >= 0.25) {
+                const currentRate = video.playbackRate;
+                if (Math.abs(currentRate - target) > 0.01) {
+                    try {
+                        video.playbackRate = target;
+                        if (video.defaultPlaybackRate !== target) {
+                            video.defaultPlaybackRate = target;
+                        }
+                    } catch (_) {}
+                }
+                if (video.preservesPitch === false) {
+                    try {
+                        video.preservesPitch = true;
+                    } catch (_) {}
+                }
             }
             HSE_UI.updateStatus();
         }
@@ -769,7 +805,7 @@
             const effectiveNow = this.pauseStartTime ? this.pauseStartTime : Date.now();
             const remainingWallSec = Math.max(1, (this.targetEndTime - effectiveNow) / 1000);
             const req = remainingVideoSec / remainingWallSec;
-            return Math.min(MAX_SPEED, Math.max(0.1, Math.round(req * 100) / 100));
+            return Math.min(MAX_SPEED, Math.max(0.25, Math.round(req * 100) / 100));
         },
 
         tick(force = false) {
@@ -941,12 +977,10 @@
             if (this.panel) this.panel.remove();
 
             const info = HSE_Intel.getContentInfo();
-            const video = HSE_Intel.getVideo();
-            if (video && Number.isFinite(video.playbackRate) && video.playbackRate > 0) {
-                HSE_Engine.currentSpeed = sanitizeSpeed(video.playbackRate);
-            } else {
-                HSE_Engine.currentSpeed = HSE_Store.getSpeedForShow(info.id);
-            }
+            const targetSpeed = (HSE_Engine.currentSpeed >= 0.25)
+                ? HSE_Engine.currentSpeed
+                : HSE_Store.getSpeedForShow(info.id);
+            HSE_Engine.currentSpeed = targetSpeed;
             HSE_Engine.lastContentId = info.id;
 
             const panel = document.createElement('div');
@@ -1023,7 +1057,7 @@
             btnMinus.title = 'Decrease speed by 0.1x (Hotkey: [ )';
             btnMinus.appendChild(createSvgIcon('minus'));
             btnMinus.onclick = () => {
-                HSE_Engine.setSpeed(Math.max(0.1, +(HSE_Engine.currentSpeed - 0.1).toFixed(2)), true, true);
+                HSE_Engine.setSpeed(Math.max(0.25, +(HSE_Engine.currentSpeed - 0.1).toFixed(2)), true, true);
                 this.resetHideTimer();
             };
 
@@ -1306,7 +1340,7 @@
                 }
 
                 if (keyName === custom.keySpeedDown) {
-                    HSE_Engine.setSpeed(Math.max(0.1, +(HSE_Engine.currentSpeed - 0.1).toFixed(1)), true, true);
+                    HSE_Engine.setSpeed(Math.max(0.25, +(HSE_Engine.currentSpeed - 0.1).toFixed(1)), true, true);
                 } else if (keyName === custom.keySpeedUp) {
                     HSE_Engine.setSpeed(Math.min(MAX_SPEED, +(HSE_Engine.currentSpeed + 0.1).toFixed(1)), true, true);
                 } else if (keyName === custom.keyReset) {
@@ -1339,6 +1373,12 @@
     async function init() {
         injectMainWorldScript();
         await HSE_Store.init();
+
+        // Ensure active speed defaults to 1.0x (normal speed), never 0.1x
+        const initialSpeed = HSE_Store.getSpeedForShow(HSE_Intel.getContentInfo().id);
+        HSE_Engine.currentSpeed = (initialSpeed >= 0.25) ? initialSpeed : 1.0;
+        document.documentElement.dataset.hsePlaybackRate = String(HSE_Engine.currentSpeed);
+
         HSE_UI.init();
         HSE_Input.init();
 
@@ -1346,18 +1386,30 @@
             HSE_Engine.enforce();
         }, REFRESH_MS);
 
-        // Instantly adopt speed changes initiated by platform controls (YouTube, Hotstar, Netflix, etc.)
+        // Adopt speed changes initiated by verified user interactions in native platform controls
         window.addEventListener('hs-platform-speed-change', (e) => {
-            if (e.detail && Number.isFinite(e.detail.speed)) {
+            if (e.detail && Number.isFinite(e.detail.speed) && e.detail.speed >= 0.25) {
                 HSE_Engine.adoptPlatformSpeed(e.detail.speed);
             }
         });
 
+        // Re-enforce active speed on ratechange if video diverged without user intent
         window.addEventListener('ratechange', (e) => {
             if (e.target && e.target.tagName === 'VIDEO') {
-                const rate = e.target.playbackRate;
-                if (Number.isFinite(rate) && rate > 0 && Math.abs(rate - HSE_Engine.currentSpeed) > 0.01) {
-                    HSE_Engine.adoptPlatformSpeed(rate);
+                const target = HSE_Engine.currentSpeed;
+                if (Number.isFinite(target) && target >= 0.25) {
+                    const rate = e.target.playbackRate;
+                    if (Math.abs(rate - target) > 0.01) {
+                        try {
+                            e.target.playbackRate = target;
+                            if (e.target.defaultPlaybackRate !== target) {
+                                e.target.defaultPlaybackRate = target;
+                            }
+                            if (e.target.preservesPitch === false) {
+                                e.target.preservesPitch = true;
+                            }
+                        } catch (_) {}
+                    }
                 }
             }
         }, true);
@@ -1374,13 +1426,13 @@
         const originalPush = history.pushState;
         history.pushState = function () {
             originalPush.apply(this, arguments);
-            setTimeout(loadInitialSpeed, 500);
+            setTimeout(loadInitialSpeed, 300);
         };
 
         const originalReplace = history.replaceState;
         history.replaceState = function () {
             originalReplace.apply(this, arguments);
-            setTimeout(loadInitialSpeed, 500);
+            setTimeout(loadInitialSpeed, 300);
         };
 
         loadInitialSpeed();

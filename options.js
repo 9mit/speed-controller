@@ -1,5 +1,5 @@
 /**
- * OTT SPEED PLAYBACK - Options Page Controller (v5.0)
+ * OTT SPEED PLAYBACK - Options Page Controller (v5.1)
  */
 
 const DEFAULT_SETTINGS = {
@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS = {
     keySkipBack: 'ArrowLeft',
     keySmartSpeed: 'Shift',
     smartSpeedValue: '2.0',
+    defaultSpeed: '1',
     speedStep: '0.1',
     speedPresets: '1, 1.25, 1.5, 1.75, 2, 2.5',
     defaultFinishTarget: '30',
@@ -45,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const inputs = document.querySelectorAll('.hotkey-input');
     const selectSmartSpeed = document.getElementById('smartSpeedValue');
+    const selectDefaultSpeed = document.getElementById('defaultSpeed');
     const selectSpeedStep = document.getElementById('speedStep');
     const inputPresets = document.getElementById('speedPresets');
     const selectFinishTarget = document.getElementById('defaultFinishTarget');
@@ -92,6 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         selectSmartSpeed.value = String(custom.smartSpeedValue || DEFAULT_SETTINGS.smartSpeedValue);
+        if (selectDefaultSpeed) {
+            selectDefaultSpeed.value = String(general.defaultSpeed || DEFAULT_SETTINGS.defaultSpeed);
+        }
         selectSpeedStep.value = String(general.speedStep || DEFAULT_SETTINGS.speedStep);
         selectFinishTarget.value = String(general.defaultFinishTarget || DEFAULT_SETTINGS.defaultFinishTarget);
         checkAdaptive.checked = (general.adaptiveEnabled !== false);
@@ -182,6 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chrome.storage.local.get(['hse_settings'], (result) => {
             const hse_settings = result.hse_settings || {};
+            if (selectDefaultSpeed) {
+                hse_settings.defaultSpeed = parseFloat(selectDefaultSpeed.value) || 1.0;
+            }
             hse_settings.speedStep = parseFloat(selectSpeedStep.value) || 0.1;
             hse_settings.presets = validatedPresets;
             hse_settings.defaultFinishTarget = parseInt(selectFinishTarget.value, 10) || 30;
@@ -207,6 +215,9 @@ document.addEventListener('DOMContentLoaded', () => {
             input.value = DEFAULT_SETTINGS[input.id];
             input.classList.remove('collision');
         });
+        if (selectDefaultSpeed) {
+            selectDefaultSpeed.value = DEFAULT_SETTINGS.defaultSpeed;
+        }
         selectSmartSpeed.value = DEFAULT_SETTINGS.smartSpeedValue;
         selectSpeedStep.value = DEFAULT_SETTINGS.speedStep;
         inputPresets.value = DEFAULT_SETTINGS.speedPresets;
@@ -217,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         chrome.storage.local.get(['hse_settings'], (result) => {
             const hse_settings = result.hse_settings || {};
+            hse_settings.defaultSpeed = 1.0;
             hse_settings.speedStep = 0.1;
             hse_settings.presets = [1, 1.25, 1.5, 1.75, 2, 2.5];
             hse_settings.defaultFinishTarget = 30;

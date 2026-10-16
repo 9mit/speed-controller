@@ -1,10 +1,10 @@
-# OTT SPEED PLAYBACK (v5.0)
+# OTT SPEED PLAYBACK (v5.1)
 ### High-performance playback speed controller with Smart Pace finish-time targeting for popular streaming services.
 
 <img src="icon128.png" width="128" height="128" alt="OTT SPEED PLAYBACK Logo">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-5.0-green.svg)](manifest.json)
+[![Version](https://img.shields.io/badge/Version-5.1.0-green.svg)](manifest.json)
 [![Platform](https://img.shields.io/badge/Platform-Chrome%20|%20Edge%20|%20Firefox-lightgrey.svg)](manifest.json)
 
 ---
