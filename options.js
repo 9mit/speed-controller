@@ -1,5 +1,5 @@
 /**
- * OTT SPEED PLAYBACK - Options Page Controller (v5.1)
+ * OTT SPEED PLAYBACK - Options Page Controller (v5.2)
  */
 
 const DEFAULT_SETTINGS = {

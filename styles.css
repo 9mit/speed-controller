@@ -1,4 +1,4 @@
-/* OTT SPEED PLAYBACK (v5.0) - High-Performance Controller Stylesheet */
+/* OTT SPEED PLAYBACK (v5.2) - High-Performance Controller Stylesheet */
 
 :root {
     --hse-bg: rgba(10, 14, 26, 0.88);
@@ -106,6 +106,80 @@
     border-radius: 50% !important;
     background: #818cf8 !important;
     box-shadow: 0 0 6px #6366f1 !important;
+}
+
+/* Studio-Grade Pulsating Live Stream Badge */
+.hse-live-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    background: rgba(239, 68, 68, 0.18) !important;
+    border: 1px solid rgba(239, 68, 68, 0.45) !important;
+    color: #fca5a5 !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    padding: 2px 8px !important;
+    border-radius: var(--hse-radius-pill) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.6px !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3) !important;
+}
+
+.hse-live-dot {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #ef4444 !important;
+    box-shadow: 0 0 8px #ef4444 !important;
+    animation: hse-pulse-red 1.5s infinite ease-in-out !important;
+}
+
+@keyframes hse-pulse-red {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.4;
+        transform: scale(0.8);
+    }
+}
+
+#hs-speed-panel.mode-live {
+    border-color: rgba(239, 68, 68, 0.35) !important;
+    box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.75), 
+                0 0 16px rgba(239, 68, 68, 0.15), 
+                inset 0 1px 0 var(--hse-glass-highlight) !important;
+}
+
+.mode-live .hse-stepper-btn:disabled {
+    opacity: 0.3 !important;
+    cursor: not-allowed !important;
+}
+
+.hs-smart-pace-section.is-live-disabled {
+    opacity: 0.65 !important;
+    position: relative !important;
+}
+
+.hs-smart-pace-section.is-live-disabled .hs-smart-chips-row,
+.hs-smart-pace-section.is-live-disabled .hs-smart-input-row {
+    pointer-events: none !important;
+    filter: grayscale(0.5) !important;
+}
+
+.hse-live-notice {
+    margin-top: 8px !important;
+    background: rgba(239, 68, 68, 0.12) !important;
+    border: 1px solid rgba(239, 68, 68, 0.28) !important;
+    color: #fca5a5 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    border-radius: var(--hse-radius-sm) !important;
+    padding: 6px 10px !important;
+    text-align: center !important;
+    line-height: 1.4 !important;
 }
 
 #hs-speed-title {

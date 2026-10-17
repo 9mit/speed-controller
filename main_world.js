@@ -1,9 +1,11 @@
 /**
- * OTT SPEED PLAYBACK - Main World Engine (v5.1.0)
+ * OTT SPEED PLAYBACK - Main World Engine (v5.2.0)
  * Runs in the page context (MAIN world) at document_start.
  * Enforces playback rate on streaming services (Hotstar, Netflix, Prime Video, YouTube, etc.)
  * and preserves video quality/resolution during speed changes by neutralizing
  * Adaptive Bitrate (ABR) quality downgrades, buffer-drain triggers, and frame-drop penalties.
+ * Includes Smart Live Video Guard: automatically preserves 1.0x normal speed and prevents
+ * player buffer exhaustion on live streams across all supported platforms.
  */
 (function () {
     'use strict';
@@ -52,8 +54,79 @@
         return connected.sort((a, b) => (b.clientWidth * b.clientHeight) - (a.clientWidth * a.clientHeight))[0] || connected[0];
     }
 
+    // --- Smart Live Video Detection ---
+    function isVideoLive(video) {
+        if (!video) return false;
+        try {
+            // 1. Explicit live marker set by content script
+            if (document.documentElement?.dataset?.hseIsLive === 'true') return true;
+
+            // 2. Standard HTML5 Media duration check (Spec: ongoing live streams return positive Infinity)
+            if (video.duration === Infinity) return true;
+
+            // 3. Ready state >= 1 with non-finite duration
+            if (!Number.isFinite(video.duration) && video.readyState >= 1) return true;
+
+            // 4. Attached Shaka player instance live check
+            if (video.__hse_shaka_player__ && typeof video.__hse_shaka_player__.isLive === 'function') {
+                if (video.__hse_shaka_player__.isLive()) return true;
+            }
+
+            // 5. Active Shaka players in page
+            for (const p of activeShakaPlayers) {
+                try {
+                    if (typeof p.getMediaElement === 'function' && p.getMediaElement() === video) {
+                        if (typeof p.isLive === 'function' && p.isLive()) return true;
+                    }
+                } catch (_) {}
+            }
+
+            // 6. YouTube Live detection (DOM & Player API)
+            const ytPlayer = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+            if (ytPlayer) {
+                if (typeof ytPlayer.getVideoData === 'function') {
+                    const data = ytPlayer.getVideoData();
+                    if (data && (data.isLive === true || data.isLiveStream === true)) return true;
+                }
+                if (typeof ytPlayer.isLive === 'function' && ytPlayer.isLive()) return true;
+                if (ytPlayer.classList && ytPlayer.classList.contains('ytp-live')) return true;
+            }
+
+            // 7. Generic / Platform DOM Live Badges in player containers
+            const container = video.closest(
+                '.html5-video-player, [data-testid="player-container"], .player-container, ' +
+                '.shaka-video-container, .video-container, [data-testid="video-player"], body'
+            );
+            if (container) {
+                if (container.querySelector(
+                    '.ytp-live-badge, [data-testid="live-tag"], .live-tag, .live-badge, ' +
+                    '.atvwebplayersdk-live-badge, .badge-style-type-live-now, [data-testid*="live-indicator"]'
+                )) {
+                    return true;
+                }
+            }
+
+            // 8. URL check for live endpoints
+            const path = window.location.pathname || '';
+            const search = window.location.search || '';
+            if (/\/live(\/|$|\?)/i.test(path) ||
+                /\/sports\/.*\/live\b/i.test(path) ||
+                /\/live-(tv|channels)\b/i.test(path) ||
+                search.includes('live=1')) {
+                return true;
+            }
+        } catch (_) {}
+        return false;
+    }
+
     // --- Active Speed State Helper ---
-    function getActiveSpeed() {
+    function getActiveSpeed(video) {
+        if (video && isVideoLive(video)) {
+            return 1.0;
+        }
+        if (document.documentElement?.dataset?.hseIsLive === 'true') {
+            return 1.0;
+        }
         const raw = document.documentElement?.dataset?.hsePlaybackRate;
         const datasetSpeed = parseFloat(raw);
         if (Number.isFinite(datasetSpeed) && datasetSpeed >= 0.25 && datasetSpeed <= 16) {
@@ -64,14 +137,18 @@
 
     // --- 1. Intercept Frame Drop & Quality Metrics (Neutralize ABR Downgrade Signals) ---
     // Web players monitor video.getVideoPlaybackQuality().droppedVideoFrames and webkitDroppedFrameCount.
-    // When speed > 1, frame rendering rate spikes. Players mistake this for hardware struggle
-    // and lower video resolution to 360p/480p. Neutralizing dropped frame count prevents this downgrade.
+    // When speed > 1 on VOD, frame rendering rate spikes. Neutralizing dropped frame count prevents downgrade.
+    // On live streams, metrics remain untouched to preserve native live player heuristics.
     try {
         if (typeof VideoPlaybackQuality !== 'undefined' && VideoPlaybackQuality.prototype) {
             const descDropped = Object.getOwnPropertyDescriptor(VideoPlaybackQuality.prototype, 'droppedVideoFrames');
             if (descDropped && descDropped.configurable) {
                 Object.defineProperty(VideoPlaybackQuality.prototype, 'droppedVideoFrames', {
-                    get() { return 0; },
+                    get() {
+                        const speed = getActiveSpeed();
+                        if (speed > 1.05 && document.documentElement?.dataset?.hseIsLive !== 'true') return 0;
+                        return descDropped.get ? descDropped.get.call(this) : 0;
+                    },
                     configurable: true,
                     enumerable: true
                 });
@@ -79,7 +156,11 @@
             const descCorrupted = Object.getOwnPropertyDescriptor(VideoPlaybackQuality.prototype, 'corruptedVideoFrames');
             if (descCorrupted && descCorrupted.configurable) {
                 Object.defineProperty(VideoPlaybackQuality.prototype, 'corruptedVideoFrames', {
-                    get() { return 0; },
+                    get() {
+                        const speed = getActiveSpeed();
+                        if (speed > 1.05 && document.documentElement?.dataset?.hseIsLive !== 'true') return 0;
+                        return descCorrupted.get ? descCorrupted.get.call(this) : 0;
+                    },
                     configurable: true,
                     enumerable: true
                 });
@@ -103,7 +184,8 @@
             try {
                 const quality = origGetQuality.call(this);
                 if (!quality) return quality;
-                const speed = getActiveSpeed();
+                if (isVideoLive(this)) return quality;
+                const speed = getActiveSpeed(this);
                 if (speed > 1.05) {
                     return new Proxy(quality, qualityProxyHandler);
                 }
@@ -119,7 +201,11 @@
         const desc = Object.getOwnPropertyDescriptor(HTMLVideoElement.prototype, 'webkitDroppedFrameCount');
         if (desc && desc.get && desc.configurable) {
             Object.defineProperty(HTMLVideoElement.prototype, 'webkitDroppedFrameCount', {
-                get() { return 0; },
+                get() {
+                    const speed = getActiveSpeed(this);
+                    if (speed > 1.05 && !isVideoLive(this)) return 0;
+                    return desc.get ? desc.get.call(this) : 0;
+                },
                 configurable: true,
                 enumerable: true
             });
@@ -154,11 +240,24 @@
                             return origSet.call(this, val);
                         }
 
+                        // --- LIVE STREAM PROTECTION ---
+                        if (isVideoLive(this)) {
+                            // Live videos must remain at 1.0x normal speed to prevent buffer drain and playback failure
+                            if (isApplyingSpeed) {
+                                return origSet.call(this, 1.0);
+                            }
+                            // Allow native player live-edge micro-adjustments (~0.95 - 1.05)
+                            if (Math.abs(n - 1.0) < 0.08) {
+                                return origSet.call(this, n);
+                            }
+                            return origSet.call(this, 1.0);
+                        }
+
                         if (isApplyingSpeed) {
                             return origSet.call(this, n);
                         }
 
-                        const activeSpeed = getActiveSpeed();
+                        const activeSpeed = getActiveSpeed(this);
 
                         // If set by a background player script without trusted user gesture (e.g. autoplay next episode),
                         // preserve the user's active speed setting instead of letting player reset to 1.0x or 0.1x!
@@ -212,6 +311,9 @@
                         if (!Number.isFinite(n) || n <= 0) {
                             return origDefaultSet ? origDefaultSet.call(this, val) : undefined;
                         }
+                        if (isVideoLive(this)) {
+                            return origDefaultSet ? origDefaultSet.call(this, 1.0) : undefined;
+                        }
                         const clamped = Math.min(16, Math.max(0.25, n));
                         return origDefaultSet ? origDefaultSet.call(this, clamped) : undefined;
                     },
@@ -229,16 +331,17 @@
             const videos = collectAllVideos(document);
             for (const v of videos) {
                 if (v && v.isConnected) {
+                    const targetSpeed = isVideoLive(v) ? 1.0 : speed;
                     try {
                         if (origSet) {
-                            origSet.call(v, speed);
+                            origSet.call(v, targetSpeed);
                         } else {
-                            v.playbackRate = speed;
+                            v.playbackRate = targetSpeed;
                         }
                         if (origDefaultSet) {
-                            origDefaultSet.call(v, speed);
+                            origDefaultSet.call(v, targetSpeed);
                         } else {
-                            v.defaultPlaybackRate = speed;
+                            v.defaultPlaybackRate = targetSpeed;
                         }
                         if (v.preservesPitch === false) {
                             v.preservesPitch = true;
@@ -256,15 +359,15 @@
     mediaEvents.forEach(evt => {
         window.addEventListener(evt, (e) => {
             if (e.target && e.target.tagName === 'VIDEO') {
-                const speed = getActiveSpeed();
-                if (Number.isFinite(speed) && speed >= 0.25) {
+                const targetSpeed = isVideoLive(e.target) ? 1.0 : getActiveSpeed(e.target);
+                if (Number.isFinite(targetSpeed) && targetSpeed >= 0.25) {
                     try {
                         const current = origGet ? origGet.call(e.target) : e.target.playbackRate;
-                        if (Math.abs(current - speed) > 0.01) {
-                            if (origSet) origSet.call(e.target, speed);
-                            else e.target.playbackRate = speed;
-                            if (origDefaultSet) origDefaultSet.call(e.target, speed);
-                            else e.target.defaultPlaybackRate = speed;
+                        if (Math.abs(current - targetSpeed) > 0.01) {
+                            if (origSet) origSet.call(e.target, targetSpeed);
+                            else e.target.playbackRate = targetSpeed;
+                            if (origDefaultSet) origDefaultSet.call(e.target, targetSpeed);
+                            else e.target.defaultPlaybackRate = targetSpeed;
                         }
                         if (e.target.preservesPitch === false) {
                             e.target.preservesPitch = true;
@@ -280,10 +383,20 @@
         if (isApplyingSpeed) return;
         if (e.target && e.target.tagName === 'VIDEO') {
             try {
+                if (isVideoLive(e.target)) {
+                    // Live stream: keep at 1.0x. If rate strayed above 1.08, restore 1.0x
+                    const current = origGet ? origGet.call(e.target) : e.target.playbackRate;
+                    if (Number.isFinite(current) && current > 1.08) {
+                        if (origSet) origSet.call(e.target, 1.0);
+                        else e.target.playbackRate = 1.0;
+                    }
+                    return;
+                }
+
                 const current = origGet ? origGet.call(e.target) : e.target.playbackRate;
                 if (!Number.isFinite(current) || current <= 0) return;
 
-                const activeSpeed = getActiveSpeed();
+                const activeSpeed = getActiveSpeed(e.target);
                 if (Math.abs(current - activeSpeed) > 0.01) {
                     if (isRecentUserGesture()) {
                         // User interacted with platform native speed control (e.g. YouTube gear menu)
@@ -315,6 +428,11 @@
     function applyShakaSpeedConfig(player, speed) {
         if (!player || typeof player.configure !== 'function') return;
         try {
+            // NEVER alter buffering goals or ABR on live streams!
+            if (typeof player.isLive === 'function' && player.isLive()) return;
+            const media = (typeof player.getMediaElement === 'function') ? player.getMediaElement() : null;
+            if (media && isVideoLive(media)) return;
+
             if (speed > 1.05) {
                 player.configure({
                     abr: {
@@ -368,12 +486,15 @@
         // 3a. Hook SimpleAbrManager:
         // By default, Shaka multiplies required bitrate by playbackRate in chooseByBandwidth:
         // a = (rate * variant.bandwidth) / bandwidthDowngradeTarget.
-        // Forcing rate = 1.0 in playbackRateChanged neutralizes this artificial penalty!
+        // Forcing rate = 1.0 on VOD neutralizes this penalty without hurting live playback!
         if (shakaObj.abr && shakaObj.abr.SimpleAbrManager && shakaObj.abr.SimpleAbrManager.prototype) {
             const abrProto = shakaObj.abr.SimpleAbrManager.prototype;
             const origRateChanged = abrProto.playbackRateChanged;
             if (origRateChanged) {
                 abrProto.playbackRateChanged = function (rate) {
+                    if (document.documentElement?.dataset?.hseIsLive === 'true') {
+                        return origRateChanged.call(this, rate);
+                    }
                     return origRateChanged.call(this, 1.0);
                 };
             }
@@ -386,6 +507,9 @@
             const origConfigure = proto.configure;
             if (origConfigure) {
                 proto.configure = function (config, value) {
+                    if (typeof this.isLive === 'function' && this.isLive()) {
+                        return origConfigure.apply(this, arguments);
+                    }
                     const speed = getActiveSpeed();
                     if (speed > 1.05 && typeof config === 'object' && config !== null) {
                         try {
@@ -412,7 +536,7 @@
                 proto.attach = function (mediaElement) {
                     activeShakaPlayers.add(this);
                     if (mediaElement) mediaElement.__hse_shaka_player__ = this;
-                    applyShakaSpeedConfig(this, getActiveSpeed());
+                    applyShakaSpeedConfig(this, getActiveSpeed(mediaElement));
                     return origAttach.apply(this, arguments);
                 };
             }
@@ -429,7 +553,7 @@
             const origSelectVariantTrack = proto.selectVariantTrack;
             if (origSelectVariantTrack) {
                 proto.selectVariantTrack = function (track, clearBuffer) {
-                    if (track && track.height && track.height >= 480) {
+                    if (track && track.height && track.height >= 480 && !(typeof this.isLive === 'function' && this.isLive())) {
                         try {
                             this.configure({
                                 abr: {
@@ -475,7 +599,7 @@
                                 this.$videoElement.__hse_shaka_player__ = this.shakaPlayer;
                                 this.$videoElement.__hse_hs_player__ = this;
                             }
-                            applyShakaSpeedConfig(this.shakaPlayer, getActiveSpeed());
+                            applyShakaSpeedConfig(this.shakaPlayer, getActiveSpeed(this.$videoElement));
                         }
                     } catch (_) {}
                     return res;
@@ -485,6 +609,9 @@
             const origHSConfigure = HSPlayer.prototype.configure;
             if (origHSConfigure) {
                 HSPlayer.prototype.configure = function (config) {
+                    if (this.isLive || (this.shakaPlayer && typeof this.shakaPlayer.isLive === 'function' && this.shakaPlayer.isLive())) {
+                        return origHSConfigure.apply(this, arguments);
+                    }
                     const speed = getActiveSpeed();
                     if (speed > 1.05 && config && typeof config === 'object') {
                         try {
@@ -549,7 +676,10 @@
         if (origAttach) {
             HlsClass.prototype.attachMedia = function (media) {
                 try {
-                    const speed = getActiveSpeed();
+                    if (media && isVideoLive(media)) {
+                        return origAttach.apply(this, arguments);
+                    }
+                    const speed = getActiveSpeed(media);
                     if (speed > 1.05 && this.config) {
                         if (!this.config._hse_base_maxBufferLength) {
                             this.config._hse_base_maxBufferLength = this.config.maxBufferLength || 30;
@@ -597,6 +727,9 @@
                 if (instance && instance.updateSettings) {
                     const origUpdate = instance.updateSettings;
                     instance.updateSettings = function (settings) {
+                        if (typeof this.isDynamic === 'function' && this.isDynamic()) {
+                            return origUpdate.apply(this, arguments);
+                        }
                         const speed = getActiveSpeed();
                         if (speed > 1.05 && settings && settings.streaming && settings.streaming.abr) {
                             try {
@@ -645,6 +778,12 @@
         syncSpeed(speed);
     });
 
+    window.addEventListener('hs-live-status-change', (e) => {
+        if (e.detail?.isLive) {
+            applySpeedToAllVideos(1.0);
+        }
+    });
+
     // Fallback MutationObserver on HTML attribute
     const speedAttrObserver = new MutationObserver(() => {
         const speed = getActiveSpeed();
@@ -654,7 +793,7 @@
     if (document.documentElement) {
         speedAttrObserver.observe(document.documentElement, {
             attributes: true,
-            attributeFilter: ['data-hse-playback-rate']
+            attributeFilter: ['data-hse-playback-rate', 'data-hse-is-live']
         });
     }
 })();

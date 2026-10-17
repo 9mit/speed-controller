@@ -1,8 +1,9 @@
 /**
- * OTT SPEED PLAYBACK (v5.1)
+ * OTT SPEED PLAYBACK (v5.2)
  * Playback rate control for YouTube, YouTube Shorts, Hotstar, JioHotstar, Netflix, Prime Video,
  * ZEE5, Airtel Xstream, JioCinema, SonyLIV, Aha, Hoichoi, Sun NXT, and MX Player.
- * Built with Smart Pace finish-time mode and adaptive speed targeting.
+ * Built with Smart Live Stream Detection & Auto Normal Speed Guard, Smart Pace finish-time mode,
+ * and adaptive speed targeting.
  */
 (function () {
     'use strict';
@@ -466,7 +467,6 @@
                 if (typeof raw.globalSpeed === 'number') {
                     const fallback = this.settings.defaultSpeed || 1.0;
                     const speed = sanitizeSpeed(raw.globalSpeed, fallback);
-                    // Recover from any previously corrupted legacy 0.1x speeds
                     this.settings.globalSpeed = (speed < 0.25) ? fallback : speed;
                 }
 
@@ -595,12 +595,90 @@
             try {
                 title = Platform.getTitle();
             } catch (_) {}
-            // Titles are UI-only; never return fields meant for persistence beyond id.
             return { id, title, platform: Platform.id };
         },
 
         getVideo() {
             return pickLargestVideo(collectVideos(document, []));
+        },
+
+        isLive(video) {
+            const v = video || this.getVideo();
+            if (!v) return false;
+            try {
+                // 1. Explicit HTML5 standard: infinite duration on ongoing live media streams
+                if (v.duration === Infinity) return true;
+
+                // 2. Ready state >= 1 with non-finite duration
+                if (!Number.isFinite(v.duration) && v.readyState >= 1) return true;
+
+                // 3. Platform specific detection
+                if (Platform.id === 'youtube') {
+                    const ytPlayer = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+                    if (ytPlayer) {
+                        if (typeof ytPlayer.getVideoData === 'function') {
+                            const data = ytPlayer.getVideoData();
+                            if (data && (data.isLive === true || data.isLiveStream === true)) return true;
+                        }
+                        if (typeof ytPlayer.isLive === 'function' && ytPlayer.isLive()) return true;
+                        if (ytPlayer.classList && ytPlayer.classList.contains('ytp-live')) return true;
+                    }
+                    if (document.querySelector('.ytp-live-badge, ytd-watch-flexy[live], .badge-style-type-live-now, ytd-live-chat-frame')) {
+                        return true;
+                    }
+                    const path = window.location.pathname || '';
+                    if (/\/live(\/|$|\?)/i.test(path) || (window.location.search && window.location.search.includes('live=1'))) {
+                        return true;
+                    }
+                }
+
+                if (Platform.id === 'hotstar') {
+                    if (document.querySelector('[data-testid="live-tag"], .live-tag, .live-badge, [data-testid="player-live-badge"]')) {
+                        return true;
+                    }
+                    const path = window.location.pathname || '';
+                    if (/\/live\b|\/sports\/.*\/live\b|\/channels\//i.test(path)) {
+                        return true;
+                    }
+                }
+
+                if (Platform.id === 'jiocinema') {
+                    if (document.querySelector('[data-testid*="live"], .live-indicator, .live-badge, .live-tag')) {
+                        return true;
+                    }
+                    const path = window.location.pathname || '';
+                    if (/\/sports\b|\/live-tv\b/i.test(path)) {
+                        return true;
+                    }
+                }
+
+                if (Platform.id === 'prime') {
+                    if (document.querySelector('.atvwebplayersdk-live-badge, [data-testid="live-indicator"], [aria-label*="Live" i]')) {
+                        return true;
+                    }
+                }
+
+                if (Platform.id === 'zee5' || Platform.id === 'sonyliv' || Platform.id === 'airtelxstream' || Platform.id === 'sunnxt' || Platform.id === 'aha' || Platform.id === 'hoichoi' || Platform.id === 'mxplayer') {
+                    const path = window.location.pathname || '';
+                    if (/\/live-tv\b|\/live-channels\b|\/channels\b/i.test(path)) {
+                        return true;
+                    }
+                }
+
+                // 4. Generic DOM check in player container
+                const container = v.closest(
+                    '.html5-video-player, [data-testid="player-container"], .player-container, ' +
+                    '.shaka-video-container, .video-container, [data-testid="video-player"], body'
+                );
+                if (container) {
+                    const badge = container.querySelector(
+                        '.ytp-live-badge, [data-testid*="live-tag"], .live-tag, .live-badge, ' +
+                        '.live-indicator, .atvwebplayersdk-live-badge, .badge-style-type-live-now'
+                    );
+                    if (badge) return true;
+                }
+            } catch (_) {}
+            return false;
         }
     };
 
@@ -619,8 +697,35 @@
     const HSE_Engine = {
         currentSpeed: 1.0,
         lastContentId: null,
+        isLiveVideo: false,
+        wasLiveVideo: false,
 
         setSpeed(speed, isPersistent = true, isManual = false) {
+            const video = HSE_Intel.getVideo();
+            const isLive = this.isLiveVideo || HSE_Intel.isLive(video);
+
+            if (isLive) {
+                // Live videos cannot be sped up to prevent immediate buffer exhaustion and stall
+                if (speed > 1.05) {
+                    if (isManual) {
+                        HSE_UI.flash('Live streams locked to 1.0x normal speed');
+                    }
+                    return;
+                }
+                this.currentSpeed = 1.0;
+                document.documentElement.dataset.hsePlaybackRate = '1';
+                document.documentElement.dataset.hseIsLive = 'true';
+                if (video) {
+                    try {
+                        video.playbackRate = 1.0;
+                        video.defaultPlaybackRate = 1.0;
+                    } catch (_) {}
+                }
+                HSE_UI.update();
+                if (isManual) HSE_UI.flash('1.0x Normal Speed');
+                return;
+            }
+
             const clamped = sanitizeSpeed(speed, 1.0);
             this.currentSpeed = clamped;
             document.documentElement.dataset.hsePlaybackRate = String(clamped);
@@ -629,7 +734,6 @@
                 window.dispatchEvent(new CustomEvent('hs-speed-change', { detail: { speed: clamped } }));
             } catch (_) {}
 
-            const video = HSE_Intel.getVideo();
             if (video) {
                 try {
                     if (Math.abs(video.playbackRate - clamped) > 0.01) {
@@ -660,6 +764,11 @@
         },
 
         adoptPlatformSpeed(speed) {
+            const video = HSE_Intel.getVideo();
+            if (this.isLiveVideo || HSE_Intel.isLive(video)) {
+                return;
+            }
+
             const clamped = sanitizeSpeed(speed, 1.0);
             if (clamped < 0.25) return;
             if (Math.abs(this.currentSpeed - clamped) < 0.01) return;
@@ -681,9 +790,32 @@
 
         syncContentSpeed() {
             if (HSE_SmartPace.isActive) return;
+            const video = HSE_Intel.getVideo();
+            const isLive = HSE_Intel.isLive(video);
+
+            if (isLive) {
+                this.isLiveVideo = true;
+                this.wasLiveVideo = true;
+                this.currentSpeed = 1.0;
+                document.documentElement.dataset.hsePlaybackRate = '1';
+                document.documentElement.dataset.hseIsLive = 'true';
+                if (video) {
+                    try {
+                        video.playbackRate = 1.0;
+                        video.defaultPlaybackRate = 1.0;
+                    } catch (_) {}
+                }
+                try {
+                    window.dispatchEvent(new CustomEvent('hs-live-status-change', { detail: { isLive: true } }));
+                } catch (_) {}
+                HSE_UI.update();
+                return;
+            }
+
             const info = HSE_Intel.getContentInfo();
-            if (info.id === this.lastContentId) return;
+            if (info.id === this.lastContentId && !this.wasLiveVideo) return;
             this.lastContentId = info.id;
+            this.wasLiveVideo = false;
 
             // When navigating to a new episode/content, maintain the active user speed!
             const targetSpeed = (this.currentSpeed >= 0.25)
@@ -695,13 +827,57 @@
         },
 
         enforce() {
+            const video = HSE_Intel.getVideo();
+            const isLive = HSE_Intel.isLive(video);
+            this.isLiveVideo = isLive;
+            document.documentElement.dataset.hseIsLive = isLive ? 'true' : 'false';
+
+            if (isLive) {
+                this.wasLiveVideo = true;
+                // Live video must stay at normal speed (1.0x)
+                if (HSE_SmartPace.isActive) {
+                    HSE_SmartPace.stop(false);
+                }
+
+                if (Math.abs(this.currentSpeed - 1.0) > 0.01) {
+                    this.currentSpeed = 1.0;
+                    document.documentElement.dataset.hsePlaybackRate = '1';
+                    try {
+                        window.dispatchEvent(new CustomEvent('hs-speed-change', { detail: { speed: 1.0 } }));
+                        window.dispatchEvent(new CustomEvent('hs-live-status-change', { detail: { isLive: true } }));
+                    } catch (_) {}
+                    HSE_UI.flash('Live Video: Auto-set to 1.0x Normal Speed', true);
+                    HSE_UI.update();
+                }
+
+                if (video) {
+                    const currentRate = video.playbackRate;
+                    if (Number.isFinite(currentRate) && Math.abs(currentRate - 1.0) > 0.05) {
+                        try {
+                            video.playbackRate = 1.0;
+                            if (video.defaultPlaybackRate !== 1.0) {
+                                video.defaultPlaybackRate = 1.0;
+                            }
+                        } catch (_) {}
+                    }
+                    if (video.preservesPitch === false) {
+                        try { video.preservesPitch = true; } catch (_) {}
+                    }
+                }
+
+                HSE_UI.updateStatus('LIVE • 1.0x Normal Speed');
+                HSE_UI.updateLiveUI(true);
+                return;
+            }
+
+            HSE_UI.updateLiveUI(false);
+
             if (!HSE_SmartPace.isActive) {
                 this.syncContentSpeed();
             } else {
                 HSE_SmartPace.tick();
             }
 
-            const video = HSE_Intel.getVideo();
             if (!video) return;
 
             const target = this.currentSpeed;
@@ -739,7 +915,12 @@
 
         start(minutes) {
             const video = HSE_Intel.getVideo();
-            if (!video || !Number.isFinite(video.duration) || video.duration <= 0) {
+            if (HSE_Intel.isLive(video)) {
+                HSE_UI.flash('Smart Pace is not available for live streams');
+                return;
+            }
+
+            if (!video || !Number.isFinite(video.duration) || video.duration <= 0 || video.duration === Infinity) {
                 HSE_UI.flash('Start playback first');
                 return;
             }
@@ -799,7 +980,7 @@
         },
 
         calculateRequiredSpeed(video) {
-            if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return null;
+            if (!video || !Number.isFinite(video.duration) || video.duration <= 0 || video.duration === Infinity) return null;
             const remainingVideoSec = Math.max(0, video.duration - video.currentTime);
             // Frozen wall time if paused
             const effectiveNow = this.pauseStartTime ? this.pauseStartTime : Date.now();
@@ -962,7 +1143,7 @@
             }
             ind.classList.add('is-visible');
             if (this.flashTimer) clearTimeout(this.flashTimer);
-            this.flashTimer = setTimeout(() => ind.classList.remove('is-visible'), isLong ? 2000 : 900);
+            this.flashTimer = setTimeout(() => ind.classList.remove('is-visible'), isLong ? 2200 : 900);
         },
 
         toggle() {
@@ -976,16 +1157,22 @@
         build() {
             if (this.panel) this.panel.remove();
 
+            const isLive = HSE_Engine.isLiveVideo || HSE_Intel.isLive();
             const info = HSE_Intel.getContentInfo();
-            const targetSpeed = (HSE_Engine.currentSpeed >= 0.25)
-                ? HSE_Engine.currentSpeed
-                : HSE_Store.getSpeedForShow(info.id);
-            HSE_Engine.currentSpeed = targetSpeed;
+
+            if (isLive) {
+                HSE_Engine.currentSpeed = 1.0;
+            } else {
+                const targetSpeed = (HSE_Engine.currentSpeed >= 0.25)
+                    ? HSE_Engine.currentSpeed
+                    : HSE_Store.getSpeedForShow(info.id);
+                HSE_Engine.currentSpeed = targetSpeed;
+            }
             HSE_Engine.lastContentId = info.id;
 
             const panel = document.createElement('div');
             panel.id = 'hs-speed-panel';
-            panel.className = 'mode-vod';
+            panel.className = isLive ? 'mode-live' : 'mode-vod';
 
             // --- Header (Draggable) ---
             const header = document.createElement('div');
@@ -1003,12 +1190,24 @@
             badge.appendChild(dot);
             badge.appendChild(badgeText);
 
+            const liveBadge = document.createElement('span');
+            liveBadge.className = 'hse-live-badge';
+            liveBadge.id = 'hse-header-live-badge';
+            const liveDot = document.createElement('span');
+            liveDot.className = 'hse-live-dot';
+            const liveText = document.createElement('span');
+            liveText.textContent = 'LIVE';
+            liveBadge.appendChild(liveDot);
+            liveBadge.appendChild(liveText);
+            liveBadge.style.display = isLive ? 'inline-flex' : 'none';
+
             const titleEl = document.createElement('span');
             titleEl.id = 'hs-speed-title';
             titleEl.textContent = info.title;
             titleEl.title = info.title;
 
             headerLeft.appendChild(badge);
+            headerLeft.appendChild(liveBadge);
             headerLeft.appendChild(titleEl);
 
             const actions = document.createElement('div');
@@ -1054,9 +1253,11 @@
 
             const btnMinus = document.createElement('button');
             btnMinus.className = 'hse-stepper-btn';
-            btnMinus.title = 'Decrease speed by 0.1x (Hotkey: [ )';
+            btnMinus.disabled = isLive;
+            btnMinus.title = isLive ? 'Speed locked to 1.0x for live video' : 'Decrease speed by 0.1x (Hotkey: [ )';
             btnMinus.appendChild(createSvgIcon('minus'));
             btnMinus.onclick = () => {
+                if (HSE_Engine.isLiveVideo || HSE_Intel.isLive()) return;
                 HSE_Engine.setSpeed(Math.max(0.25, +(HSE_Engine.currentSpeed - 0.1).toFixed(2)), true, true);
                 this.resetHideTimer();
             };
@@ -1066,7 +1267,7 @@
 
             const heroVal = document.createElement('span');
             heroVal.id = 'hse-hero-speed';
-            heroVal.textContent = HSE_Engine.currentSpeed.toFixed(2).replace(/\.00$/, '');
+            heroVal.textContent = isLive ? '1' : HSE_Engine.currentSpeed.toFixed(2).replace(/\.00$/, '');
 
             const heroUnit = document.createElement('span');
             heroUnit.className = 'hse-hero-unit';
@@ -1077,9 +1278,11 @@
 
             const btnPlus = document.createElement('button');
             btnPlus.className = 'hse-stepper-btn';
-            btnPlus.title = 'Increase speed by 0.1x (Hotkey: ] )';
+            btnPlus.disabled = isLive;
+            btnPlus.title = isLive ? 'Speed locked to 1.0x for live video' : 'Increase speed by 0.1x (Hotkey: ] )';
             btnPlus.appendChild(createSvgIcon('plus'));
             btnPlus.onclick = () => {
+                if (HSE_Engine.isLiveVideo || HSE_Intel.isLive()) return;
                 HSE_Engine.setSpeed(Math.min(MAX_SPEED, +(HSE_Engine.currentSpeed + 0.1).toFixed(2)), true, true);
                 this.resetHideTimer();
             };
@@ -1103,7 +1306,7 @@
 
             const statusText = document.createElement('span');
             statusText.id = 'hs-speed-status';
-            statusText.textContent = `${HSE_Engine.currentSpeed}x Active`;
+            statusText.textContent = isLive ? 'LIVE • 1.0x Normal Speed' : `${HSE_Engine.currentSpeed}x Active`;
 
             subHeroRow.appendChild(resetPill);
             subHeroRow.appendChild(statusText);
@@ -1115,12 +1318,16 @@
             DEFAULT_SPEEDS.forEach((s) => {
                 const btn = document.createElement('button');
                 btn.className = 'hs-speed-btn';
-                if (Math.abs(s - HSE_Engine.currentSpeed) < 0.01) {
+                if (isLive) {
+                    btn.disabled = (s !== 1);
+                    if (s === 1) btn.classList.add('is-active');
+                } else if (Math.abs(s - HSE_Engine.currentSpeed) < 0.01) {
                     btn.classList.add('is-active');
                 }
                 btn.dataset.speed = String(s);
                 btn.textContent = `${s}x`;
                 btn.onclick = () => {
+                    if (isLive && s !== 1) return;
                     HSE_Engine.setSpeed(parseFloat(btn.dataset.speed), true, true);
                     this.resetHideTimer();
                 };
@@ -1129,7 +1336,7 @@
 
             // --- Smart Pace Finish-Time Card ---
             const smartSec = document.createElement('div');
-            smartSec.className = 'hs-smart-pace-section';
+            smartSec.className = isLive ? 'hs-smart-pace-section is-live-disabled' : 'hs-smart-pace-section';
 
             const smartHeader = document.createElement('div');
             smartHeader.className = 'hs-smart-pace-header';
@@ -1156,6 +1363,7 @@
                 chip.className = 'hs-smart-chip';
                 chip.textContent = `${m}m`;
                 chip.onclick = () => {
+                    if (HSE_Engine.isLiveVideo || HSE_Intel.isLive()) return;
                     const inp = document.getElementById('hs-smart-input');
                     if (inp) inp.value = m;
                     HSE_SmartPace.start(m);
@@ -1189,6 +1397,7 @@
             startBtn.className = 'hs-smart-btn hs-smart-start';
             startBtn.textContent = HSE_SmartPace.isActive ? 'Update' : 'Start';
             startBtn.onclick = () => {
+                if (HSE_Engine.isLiveVideo || HSE_Intel.isLive()) return;
                 const val = parseInt(input.value, 10) || 30;
                 HSE_SmartPace.start(val);
                 this.resetHideTimer();
@@ -1219,6 +1428,13 @@
             smartSec.appendChild(inputRow);
             smartSec.appendChild(smartStatus);
 
+            if (isLive) {
+                const liveNotice = document.createElement('div');
+                liveNotice.className = 'hse-live-notice';
+                liveNotice.textContent = 'Live stream active — playback locked to 1.0x to prevent stream drop.';
+                smartSec.appendChild(liveNotice);
+            }
+
             panel.appendChild(header);
             panel.appendChild(heroSection);
             panel.appendChild(subHeroRow);
@@ -1239,21 +1455,77 @@
             this.resetHideTimer();
         },
 
+        updateLiveUI(isLive) {
+            if (!this.panel) return;
+            this.panel.classList.toggle('mode-live', isLive);
+            this.panel.classList.toggle('mode-vod', !isLive);
+
+            const liveBadge = document.getElementById('hse-header-live-badge');
+            if (liveBadge) {
+                liveBadge.style.display = isLive ? 'inline-flex' : 'none';
+            }
+
+            const heroVal = document.getElementById('hse-hero-speed');
+            if (heroVal && isLive) {
+                heroVal.textContent = '1';
+            }
+
+            const stepperBtns = this.panel.querySelectorAll('.hse-stepper-btn');
+            stepperBtns.forEach(btn => {
+                btn.disabled = isLive;
+                btn.title = isLive ? 'Speed locked to 1.0x for live video' : btn.title;
+            });
+
+            this.panel.querySelectorAll('.hs-speed-btn').forEach(btn => {
+                const s = parseFloat(btn.dataset.speed);
+                if (isLive) {
+                    btn.disabled = (s !== 1);
+                    btn.classList.toggle('is-active', s === 1);
+                } else {
+                    btn.disabled = false;
+                }
+            });
+
+            const smartSec = this.panel.querySelector('.hs-smart-pace-section');
+            if (smartSec) {
+                smartSec.classList.toggle('is-live-disabled', isLive);
+                let notice = smartSec.querySelector('.hse-live-notice');
+                if (isLive) {
+                    if (!notice) {
+                        notice = document.createElement('div');
+                        notice.className = 'hse-live-notice';
+                        notice.textContent = 'Live stream active — playback locked to 1.0x to prevent stream drop.';
+                        smartSec.appendChild(notice);
+                    }
+                } else if (notice) {
+                    notice.remove();
+                }
+            }
+        },
+
         update() {
             if (!this.panel) return;
+            const isLive = HSE_Engine.isLiveVideo || HSE_Intel.isLive();
+            this.updateLiveUI(isLive);
+
             const speed = HSE_Engine.currentSpeed;
-            this.panel.querySelectorAll('.hs-speed-btn').forEach((btn) => {
-                btn.classList.toggle('is-active', Math.abs(parseFloat(btn.dataset.speed) - speed) < 0.01);
-            });
+            if (!isLive) {
+                this.panel.querySelectorAll('.hs-speed-btn').forEach((btn) => {
+                    btn.classList.toggle('is-active', Math.abs(parseFloat(btn.dataset.speed) - speed) < 0.01);
+                });
+            }
+
             const titleEl = document.getElementById('hs-speed-title');
             if (titleEl) {
                 titleEl.textContent = HSE_Intel.getContentInfo().title;
                 titleEl.title = titleEl.textContent;
             }
+
             const heroVal = document.getElementById('hse-hero-speed');
             if (heroVal) {
-                heroVal.textContent = speed.toFixed(2).replace(/\.00$/, '');
+                heroVal.textContent = isLive ? '1' : speed.toFixed(2).replace(/\.00$/, '');
             }
+
             this.updateStatus();
             this.updateSmartPaceStatus(speed);
         },
@@ -1261,7 +1533,11 @@
         updateStatus(text) {
             const status = document.getElementById('hs-speed-status');
             if (status) {
-                status.textContent = text || `${HSE_Engine.currentSpeed}x Active`;
+                if (HSE_Engine.isLiveVideo || HSE_Intel.isLive()) {
+                    status.textContent = 'LIVE • 1.0x Normal Speed';
+                } else {
+                    status.textContent = text || `${HSE_Engine.currentSpeed}x Active`;
+                }
             }
         },
 
@@ -1269,7 +1545,7 @@
             const el = document.getElementById('hs-smart-status');
             const badge = document.getElementById('hse-smart-badge');
             if (el) {
-                if (HSE_SmartPace.isActive) {
+                if (HSE_SmartPace.isActive && !(HSE_Engine.isLiveVideo || HSE_Intel.isLive())) {
                     const video = HSE_Intel.getVideo();
                     const remSec = (video && Number.isFinite(video.duration)) ? Math.max(0, Math.round(video.duration - video.currentTime)) : 0;
                     const remMin = Math.ceil(remSec / 60);
@@ -1330,8 +1606,13 @@
 
                 const keyName = this.formatKey(e);
                 const custom = HSE_Store.customSettings;
+                const isLive = HSE_Engine.isLiveVideo || HSE_Intel.isLive();
 
                 if (keyName === custom.keySmartSpeed && !this.isSmartSpeedActive && !e.repeat) {
+                    if (isLive) {
+                        HSE_UI.flash('Fast-forward disabled on live video');
+                        return;
+                    }
                     this.isSmartSpeedActive = true;
                     this.preSmartSpeed = HSE_Engine.currentSpeed;
                     HSE_Engine.setSpeed(custom.smartSpeedValue, false, true);
@@ -1340,18 +1621,36 @@
                 }
 
                 if (keyName === custom.keySpeedDown) {
+                    if (isLive) {
+                        HSE_UI.flash('Live video: 1.0x Normal Speed only');
+                        return;
+                    }
                     HSE_Engine.setSpeed(Math.max(0.25, +(HSE_Engine.currentSpeed - 0.1).toFixed(1)), true, true);
                 } else if (keyName === custom.keySpeedUp) {
+                    if (isLive) {
+                        HSE_UI.flash('Live video: 1.0x Normal Speed only');
+                        return;
+                    }
                     HSE_Engine.setSpeed(Math.min(MAX_SPEED, +(HSE_Engine.currentSpeed + 0.1).toFixed(1)), true, true);
                 } else if (keyName === custom.keyReset) {
                     HSE_Engine.setSpeed(1.0, true, true);
                 } else if (keyName === custom.keySkipForward) {
+                    if (isLive) {
+                        HSE_UI.flash('Cannot skip forward on live video');
+                        return;
+                    }
                     const video = HSE_Intel.getVideo();
                     if (video) video.currentTime += 10;
                     HSE_UI.flash('+10s');
                 } else if (keyName === custom.keySkipBack) {
                     const video = HSE_Intel.getVideo();
-                    if (video) video.currentTime -= 10;
+                    if (video) {
+                        if (isLive && video.seekable && video.seekable.length > 0) {
+                            video.currentTime = Math.max(video.seekable.start(0), video.currentTime - 10);
+                        } else {
+                            video.currentTime -= 10;
+                        }
+                    }
                     HSE_UI.flash('-10s');
                 }
             });
@@ -1374,9 +1673,18 @@
         injectMainWorldScript();
         await HSE_Store.init();
 
-        // Ensure active speed defaults to 1.0x (normal speed), never 0.1x
-        const initialSpeed = HSE_Store.getSpeedForShow(HSE_Intel.getContentInfo().id);
-        HSE_Engine.currentSpeed = (initialSpeed >= 0.25) ? initialSpeed : 1.0;
+        // Check if currently playing video is live
+        const isLive = HSE_Intel.isLive();
+        HSE_Engine.isLiveVideo = isLive;
+
+        if (isLive) {
+            HSE_Engine.currentSpeed = 1.0;
+            document.documentElement.dataset.hseIsLive = 'true';
+        } else {
+            const initialSpeed = HSE_Store.getSpeedForShow(HSE_Intel.getContentInfo().id);
+            HSE_Engine.currentSpeed = (initialSpeed >= 0.25) ? initialSpeed : 1.0;
+            document.documentElement.dataset.hseIsLive = 'false';
+        }
         document.documentElement.dataset.hsePlaybackRate = String(HSE_Engine.currentSpeed);
 
         HSE_UI.init();
@@ -1385,6 +1693,23 @@
         setInterval(() => {
             HSE_Engine.enforce();
         }, REFRESH_MS);
+
+        // Immediate check when video duration or state changes (vital for live stream initialization)
+        window.addEventListener('durationchange', (e) => {
+            if (e.target && e.target.tagName === 'VIDEO') {
+                if (HSE_Intel.isLive(e.target)) {
+                    HSE_Engine.enforce();
+                }
+            }
+        }, true);
+
+        window.addEventListener('playing', (e) => {
+            if (e.target && e.target.tagName === 'VIDEO') {
+                if (HSE_Intel.isLive(e.target)) {
+                    HSE_Engine.enforce();
+                }
+            }
+        }, true);
 
         // Adopt speed changes initiated by verified user interactions in native platform controls
         window.addEventListener('hs-platform-speed-change', (e) => {
@@ -1396,6 +1721,18 @@
         // Re-enforce active speed on ratechange if video diverged without user intent
         window.addEventListener('ratechange', (e) => {
             if (e.target && e.target.tagName === 'VIDEO') {
+                if (HSE_Intel.isLive(e.target)) {
+                    if (Math.abs(e.target.playbackRate - 1.0) > 0.05) {
+                        try {
+                            e.target.playbackRate = 1.0;
+                            if (e.target.defaultPlaybackRate !== 1.0) {
+                                e.target.defaultPlaybackRate = 1.0;
+                            }
+                        } catch (_) {}
+                    }
+                    return;
+                }
+
                 const target = HSE_Engine.currentSpeed;
                 if (Number.isFinite(target) && target >= 0.25) {
                     const rate = e.target.playbackRate;
