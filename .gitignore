@@ -1,0 +1,16 @@
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Chrome Extension Distribution
+*.zip
+*.crx
+*.pem
+
+# Development
+node_modules/
+package-lock.json
+.vscode/
+.idea/
+.env
+.DS_Store

@@ -1,0 +1,104 @@
+# OTT SPEED PLAYBACK (v5.3)
+### High-performance playback speed controller with Smart Pace finish-time targeting and Smart Live Stream Guard for popular streaming services.
+
+<img src="icon128.png" width="128" height="128" alt="OTT SPEED PLAYBACK Logo">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-5.3.0-green.svg)](manifest.json)
+[![Platform](https://img.shields.io/badge/Platform-Chrome%20|%20Edge%20|%20Firefox-lightgrey.svg)](manifest.json)
+
+---
+
+## Overview
+
+**OTT SPEED PLAYBACK** gives you complete, robust control over your video playback speed across YouTube, YouTube Shorts, and major streaming / OTT platforms. Version 5.3 introduces **Smart Live Stream Guard**, seamlessly co-existing with native player speed setters, neutralizing live buffer exhaustion, and **Smart Pace Finish-Time Mode**—allowing you to choose how much time you have, and automatically calculating the optimal playback rate to finish right on schedule.
+
+### What Makes v5.3 Special:
+- **Smart Live Stream Guard (v5.3)**: Detects live broadcasts automatically across YouTube, Hotstar/JioHotstar, JioCinema, SonyLIV, Zee5, Prime Video, and generic HTML5 players. Automatically locks playback to 1.0x Normal Speed and prevents artificial buffer inflation or high-speed exhaustion, ensuring continuous, crash-free live playback.
+- **Bi-Directional Native Player Compatibility**: Adjusting speed natively via the platform's player menu (e.g. YouTube 2x, 1.5x, Normal) works seamlessly without conflicts or overrides. The extension automatically syncs and reflects the chosen speed.
+- **Studio-Grade Tactile UI**: Redesigned from the ground up with obsidian glassmorphism, tabular monospace numerals, draggable header, pulsating red LIVE stream indicator badge, smooth micro-interactions, non-intrusive floating HUD pill indicator, and an executive settings dashboard.
+- **Zero Quality Drops (`main_world.js`)**: Neutralizes aggressive Adaptive Bitrate (ABR) downshifting in Shaka Player and Hls.js during high-speed playback on VOD, keeping video crystal clear in 1080p/4K while preserving native live stream configurations.
+- **Smart Pace Finish-Time Mode**: Select quick target finish times (`20m`, `30m`, `45m`, `60m`) or enter a custom duration in minutes. The controller calculates exact playback speed based on remaining video duration versus remaining wall time.
+- **Pause-Aware & Seek-Aware**: Wall time automatically freezes while video is paused, and required speed instantly recalculates if you seek forward or backward.
+- **Smooth Speed Adjustments**: Uses hysteresis thresholding (`0.05x`) and adjustment cooldowns to eliminate jitter and distracting micro-changes.
+- **Persistent Speed Memory**: Remembers your preferred playback speed per show / title across page reloads (safely segregated from live broadcasts).
+- **One-Click Action Toggle**: Clicking the extension icon in your browser toolbar instantly toggles the in-page speed overlay.
+- **100% Private & Local**: Zero remote AI, no analytics, no external tracking, no telemetry, and local-only storage.
+
+---
+
+## Supported Streaming Services & Platforms
+
+1. **YouTube & YouTube Shorts** (`youtube.com`, `youtu.be`, `/watch?v=...`, `/shorts/...`)
+2. **Disney+ Hotstar / JioHotstar** (`hotstar.com`, `jiohotstar.com`)
+3. **Netflix** (`netflix.com`)
+4. **Amazon Prime Video** (`primevideo.com`, regional `amazon.*/gp/video/*`)
+5. **ZEE5** (`zee5.com`)
+6. **JioCinema** (`jiocinema.com`)
+7. **SonyLIV** (`sonyliv.com`)
+8. **Airtel Xstream / Xstream Play** (`airtelxstream.in`, `xstreamplay.in`)
+9. **Aha** (`aha.video`)
+10. **Hoichoi** (`hoichoi.tv`)
+11. **Sun NXT** (`sunnxt.com`)
+12. **MX Player** (`mxplayer.in`)
+
+---
+
+## Default Keyboard Shortcuts
+
+| Action | Shortcut | Description |
+| :--- | :--- | :--- |
+| **Speed Down** | `[` | Decrease speed by 0.1x |
+| **Speed Up** | `]` | Increase speed by 0.1x |
+| **Reset Normal** | `r` | Return immediately to 1.0x normal speed |
+| **Smart Speed** | `Shift` *(Hold)* | Temporary fast-forward boost (default: 2.0x) |
+| **Rewind** | `ArrowLeft` | Jump back 10 seconds |
+| **Skip Forward** | `ArrowRight` | Jump forward 10 seconds |
+
+*All keyboard shortcuts and step sizes can be customized in the Extension Options page.*
+
+---
+
+## Privacy & Security Guarantees
+
+- **Zero External APIs or Analytics**: Operates 100% locally in your browser.
+- **Zero Network Telemetry**: Never makes outbound network requests.
+- **Local Storage Only**: All speed preferences reside solely in your browser's `chrome.storage.local`.
+- **Strict Least Privilege**: Manifest permissions are strictly limited to `activeTab`, `scripting`, `storage`, and designated streaming host patterns.
+
+---
+
+## Technical Architecture
+
+```text
+OTT SPEED PLAYBACK v5.3
+ ├── main_world.js             (ABR bitrate neutralizer, Shaka/Hls protection, Live Stream Guard)
+ ├── background.js             (Service worker, toolbar action click toggle, options router)
+ ├── content.js
+ │    ├── 12 Platform Adapters (YouTube & Shorts, Hotstar, Netflix, Prime, Zee5, etc.)
+ │    ├── HSE_Intel            (Viewport-aware & Shadow-DOM video element discovery)
+ │    ├── HSE_Engine           (Playback speed enforcement & synchronization)
+ │    ├── HSE_SmartPace        (Finish-time calculation, pause compensation & hysteresis)
+ │    ├── HSE_Store            (Local storage hydration, per-show memory & pace profile)
+ │    ├── HSE_UI               (Floating glassmorphism speed panel & flash overlay)
+ │    └── HSE_Input            (Keyboard shortcut listener & typing guard)
+ └── styles.css                (Lightweight glassmorphic UI stylesheet)
+```
+
+---
+
+## Installation & Development
+
+### Chrome & Edge (Load Unpacked)
+1. Open `chrome://extensions/` or `edge://extensions/`.
+2. Enable **Developer mode** in the top right.
+3. Click **Load unpacked** and select the root directory of this extension.
+
+### Run Static & Syntax Verification
+```bash
+node --check content.js background.js options.js main_world.js
+```
+
+---
+
+*Disclaimer: This project is an independent open-source tool and is not affiliated with, endorsed by, or associated with Disney, Hotstar, Jio, Netflix, Amazon, or any streaming provider.*

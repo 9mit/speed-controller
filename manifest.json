@@ -1,0 +1,164 @@
+{
+  "manifest_version": 3,
+  "name": "OTT SPEED PLAYBACK",
+  "version": "5.3.0",
+  "description": "Control playback speed with Smart Pace finish-time targeting and custom presets on YouTube and popular streaming services.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.hotstar.com/*",
+    "https://*.jiohotstar.com/*",
+    "https://*.netflix.com/*",
+    "https://*.primevideo.com/*",
+    "https://*.zee5.com/*",
+    "https://*.airtelxstream.in/*",
+    "https://*.xstreamplay.in/*",
+    "https://*.jiocinema.com/*",
+    "https://*.sonyliv.com/*",
+    "https://*.aha.video/*",
+    "https://*.hoichoi.tv/*",
+    "https://*.sunnxt.com/*",
+    "https://*.mxplayer.in/*",
+    "https://*.youtube.com/*",
+    "https://*.youtu.be/*",
+    "https://*.amazon.com/gp/video/*",
+    "https://*.amazon.in/gp/video/*",
+    "https://*.amazon.co.uk/gp/video/*",
+    "https://*.amazon.de/gp/video/*",
+    "https://*.amazon.ca/gp/video/*",
+    "https://*.amazon.com.au/gp/video/*",
+    "https://*.amazon.co.jp/gp/video/*",
+    "https://*.amazon.fr/gp/video/*",
+    "https://*.amazon.it/gp/video/*",
+    "https://*.amazon.es/gp/video/*",
+    "https://*.amazon.com.br/gp/video/*",
+    "https://*.amazon.com.mx/gp/video/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.hotstar.com/*",
+        "https://*.jiohotstar.com/*",
+        "https://*.netflix.com/*",
+        "https://*.primevideo.com/*",
+        "https://*.zee5.com/*",
+        "https://*.airtelxstream.in/*",
+        "https://*.xstreamplay.in/*",
+        "https://*.jiocinema.com/*",
+        "https://*.sonyliv.com/*",
+        "https://*.aha.video/*",
+        "https://*.hoichoi.tv/*",
+        "https://*.sunnxt.com/*",
+        "https://*.mxplayer.in/*",
+        "https://*.youtube.com/*",
+        "https://*.youtu.be/*",
+        "https://*.amazon.com/gp/video/*",
+        "https://*.amazon.in/gp/video/*",
+        "https://*.amazon.co.uk/gp/video/*",
+        "https://*.amazon.de/gp/video/*",
+        "https://*.amazon.ca/gp/video/*",
+        "https://*.amazon.com.au/gp/video/*",
+        "https://*.amazon.co.jp/gp/video/*",
+        "https://*.amazon.fr/gp/video/*",
+        "https://*.amazon.it/gp/video/*",
+        "https://*.amazon.es/gp/video/*",
+        "https://*.amazon.com.br/gp/video/*",
+        "https://*.amazon.com.mx/gp/video/*"
+      ],
+      "js": ["main_world.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://*.hotstar.com/*",
+        "https://*.jiohotstar.com/*",
+        "https://*.netflix.com/*",
+        "https://*.primevideo.com/*",
+        "https://*.zee5.com/*",
+        "https://*.airtelxstream.in/*",
+        "https://*.xstreamplay.in/*",
+        "https://*.jiocinema.com/*",
+        "https://*.sonyliv.com/*",
+        "https://*.aha.video/*",
+        "https://*.hoichoi.tv/*",
+        "https://*.sunnxt.com/*",
+        "https://*.mxplayer.in/*",
+        "https://*.youtube.com/*",
+        "https://*.youtu.be/*",
+        "https://*.amazon.com/gp/video/*",
+        "https://*.amazon.in/gp/video/*",
+        "https://*.amazon.co.uk/gp/video/*",
+        "https://*.amazon.de/gp/video/*",
+        "https://*.amazon.ca/gp/video/*",
+        "https://*.amazon.com.au/gp/video/*",
+        "https://*.amazon.co.jp/gp/video/*",
+        "https://*.amazon.fr/gp/video/*",
+        "https://*.amazon.it/gp/video/*",
+        "https://*.amazon.es/gp/video/*",
+        "https://*.amazon.com.br/gp/video/*",
+        "https://*.amazon.com.mx/gp/video/*"
+      ],
+      "css": ["styles.css"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["main_world.js"],
+      "matches": [
+        "https://*.hotstar.com/*",
+        "https://*.jiohotstar.com/*",
+        "https://*.netflix.com/*",
+        "https://*.primevideo.com/*",
+        "https://*.zee5.com/*",
+        "https://*.airtelxstream.in/*",
+        "https://*.xstreamplay.in/*",
+        "https://*.jiocinema.com/*",
+        "https://*.sonyliv.com/*",
+        "https://*.aha.video/*",
+        "https://*.hoichoi.tv/*",
+        "https://*.sunnxt.com/*",
+        "https://*.mxplayer.in/*",
+        "https://*.youtube.com/*",
+        "https://*.youtu.be/*",
+        "https://*.amazon.com/*",
+        "https://*.amazon.in/*",
+        "https://*.amazon.co.uk/*",
+        "https://*.amazon.de/*",
+        "https://*.amazon.ca/*",
+        "https://*.amazon.com.au/*",
+        "https://*.amazon.co.jp/*",
+        "https://*.amazon.fr/*",
+        "https://*.amazon.it/*",
+        "https://*.amazon.es/*",
+        "https://*.amazon.com.br/*",
+        "https://*.amazon.com.mx/*"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "OTT SPEED PLAYBACK",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  }
+}
