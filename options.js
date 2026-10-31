@@ -1,5 +1,5 @@
 /**
- * OTT SPEED PLAYBACK - Options Page Controller (v5.3)
+ * OTT SPEED PLAYBACK - Options Page Controller (v5.3.1)
  */
 
 const DEFAULT_SETTINGS = {
@@ -15,7 +15,8 @@ const DEFAULT_SETTINGS = {
     speedPresets: '1, 1.25, 1.5, 1.75, 2, 2.5',
     defaultFinishTarget: '30',
     adaptiveEnabled: true,
-    learnOverrides: true
+    learnOverrides: true,
+    showSpeedOverlay: true
 };
 
 function formatKey(e) {
@@ -52,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectFinishTarget = document.getElementById('defaultFinishTarget');
     const checkAdaptive = document.getElementById('adaptiveEnabled');
     const checkLearn = document.getElementById('learnOverrides');
+    const checkSpeedOverlay = document.getElementById('showSpeedOverlay');
     const personalPaceDisplay = document.getElementById('personalPaceDisplay');
     const resetPaceBtn = document.getElementById('resetPaceBtn');
 
@@ -101,6 +103,9 @@ document.addEventListener('DOMContentLoaded', () => {
         selectFinishTarget.value = String(general.defaultFinishTarget || DEFAULT_SETTINGS.defaultFinishTarget);
         checkAdaptive.checked = (general.adaptiveEnabled !== false);
         checkLearn.checked = (general.learnOverrides !== false);
+        if (checkSpeedOverlay) {
+            checkSpeedOverlay.checked = (custom.showSpeedOverlay !== false);
+        }
 
         if (Array.isArray(general.presets) && general.presets.length) {
             inputPresets.value = general.presets.join(', ');
@@ -181,6 +186,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const smartVal = parseFloat(selectSmartSpeed.value);
         customSettings.smartSpeedValue = (Number.isFinite(smartVal) && smartVal >= 0.1 && smartVal <= 16) ? Math.round(smartVal * 100) / 100 : 2.0;
+        if (checkSpeedOverlay) {
+            customSettings.showSpeedOverlay = checkSpeedOverlay.checked;
+        }
 
         const rawPresets = inputPresets.value.split(',').map(s => parseFloat(s.trim())).filter(n => Number.isFinite(n) && n > 0 && n <= 16);
         const validatedPresets = rawPresets.length ? rawPresets.map(n => Math.round(n * 100) / 100) : [1, 1.25, 1.5, 1.75, 2, 2.5];
@@ -224,6 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
         selectFinishTarget.value = DEFAULT_SETTINGS.defaultFinishTarget;
         checkAdaptive.checked = DEFAULT_SETTINGS.adaptiveEnabled;
         checkLearn.checked = DEFAULT_SETTINGS.learnOverrides;
+        if (checkSpeedOverlay) checkSpeedOverlay.checked = DEFAULT_SETTINGS.showSpeedOverlay;
         checkCollisions();
 
         chrome.storage.local.get(['hse_settings'], (result) => {
@@ -243,7 +252,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     keySkipForward: DEFAULT_SETTINGS.keySkipForward,
                     keySkipBack: DEFAULT_SETTINGS.keySkipBack,
                     keySmartSpeed: DEFAULT_SETTINGS.keySmartSpeed,
-                    smartSpeedValue: 2.0
+                    smartSpeedValue: 2.0,
+                    showSpeedOverlay: true
                 },
                 hse_settings: hse_settings
             }, () => {

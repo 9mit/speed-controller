@@ -1,5 +1,5 @@
 /**
- * OTT SPEED PLAYBACK (v5.3)
+ * OTT SPEED PLAYBACK (v5.3.1)
  * Playback rate control for YouTube, YouTube Shorts, Hotstar, JioHotstar, Netflix, Prime Video,
  * ZEE5, Airtel Xstream, JioCinema, SonyLIV, Aha, Hoichoi, Sun NXT, and MX Player.
  * Built with Smart Live Stream Detection & Auto Normal Speed Guard, Smart Pace finish-time mode,
@@ -452,7 +452,8 @@
             keySkipForward: 'ArrowRight',
             keySkipBack: 'ArrowLeft',
             keySmartSpeed: 'Shift',
-            smartSpeedValue: 2.0
+            smartSpeedValue: 2.0,
+            showSpeedOverlay: true
         },
 
         /**
@@ -757,9 +758,9 @@
                     if (HSE_SmartPace.isActive) {
                         HSE_SmartPace.stop(false);
                     }
+                    HSE_UI.flash(clamped + 'x');
                 }
                 HSE_UI.update();
-                HSE_UI.flash(clamped + 'x');
             }
         },
 
@@ -847,7 +848,6 @@
                         window.dispatchEvent(new CustomEvent('hs-speed-change', { detail: { speed: 1.0 } }));
                         window.dispatchEvent(new CustomEvent('hs-live-status-change', { detail: { isLive: true } }));
                     } catch (_) {}
-                    HSE_UI.flash('Live Video: Auto-set to 1.0x Normal Speed', true);
                     HSE_UI.update();
                 }
 
@@ -1102,7 +1102,6 @@
         flashTimer: null,
 
         init() {
-            this.createIndicator();
             const existingBadge = document.getElementById('hse-player-badge');
             if (existingBadge) existingBadge.remove();
             window.addEventListener(TOGGLE_EVENT, () => this.toggle());
@@ -1142,6 +1141,7 @@
         },
 
         flash(text, isLong = false) {
+            if (HSE_Store.customSettings.showSpeedOverlay === false) return;
             const ind = this.createIndicator();
             if (!ind) return;
             const textSpan = ind.querySelector('#hse-flash-text');

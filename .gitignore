@@ -4,6 +4,7 @@ Desktop.ini
 
 # Chrome Extension Distribution
 *.zip
+!ott-speed-playback-*.zip
 *.crx
 *.pem
 

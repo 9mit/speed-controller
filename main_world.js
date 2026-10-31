@@ -1,5 +1,5 @@
 /**
- * OTT SPEED PLAYBACK - Main World Engine (v5.3.0)
+ * OTT SPEED PLAYBACK - Main World Engine (v5.3.1)
  * Runs in the page context (MAIN world) at document_start.
  * Enforces playback rate on streaming services (Hotstar, Netflix, Prime Video, YouTube, etc.)
  * and preserves video quality/resolution during speed changes by neutralizing
